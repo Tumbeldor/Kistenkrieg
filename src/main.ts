@@ -65,7 +65,7 @@ function validMember(id: string, raw: Record<string, unknown>): LobbyMember {
     id,
     name: cleanName(typeof raw.name === 'string' ? raw.name : 'Spieler'),
     level: Math.max(1, Math.min(30, Number(raw.level) | 0)),
-    skin: SKINS.some((s) => s.id === raw.skin) ? (raw.skin as string) : 'blue',
+    skin: SKINS.some((s) => s.id === raw.skin) ? (raw.skin as string) : 'woodland',
     hat: HATS.some((h) => h.id === raw.hat) ? (raw.hat as string) : 'none',
     primary: prim,
     perk: PERKS.some((p) => p.id === raw.perk) ? (raw.perk as string) : 'none',
@@ -142,7 +142,7 @@ function renderLoadout() {
     const dpr = 2;
     c.width = 120 * dpr; c.height = 34 * dpr;
     renderer.gunIcon(c, w);
-  }, (c, hat, skin) => renderer.avatar(c, skin, hat, profile.primary, 0.6));
+  }, (c, hat, skin) => renderer.avatar(c, skin, hat, profile.primary, 0.6), (c, skin) => renderer.camoSwatch(c, skin));
 }
 
 /** Push loadout/name changes into the running game or to the host. */
@@ -485,7 +485,7 @@ function renderLobbyScreen() {
   const needFriends = s.settings.mode === 'dm' && s.settings.bots === 0 && s.members.length < 2;
   startBtn.disabled = needFriends;
   startBtn.textContent = needFriends ? 'Warte auf Mitspieler …'
-    : s.members.length > 1 ? `▶ Spiel starten (${s.members.length} Spieler)` : '▶ Spiel starten (allein)';
+    : s.members.length > 1 ? `Spiel starten (${s.members.length} Spieler)` : 'Spiel starten (allein)';
 }
 
 $('lobby-start').onclick = () => {

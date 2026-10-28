@@ -1,5 +1,5 @@
 // Visual + audio reactions to game events (particles, kill feed, damage numbers, shake).
-import { WEAPONS, WeaponId, skinDef } from './config';
+import { WEAPONS, WeaponId } from './config';
 import type { Game, GameEvent } from './game';
 import { rand } from './rng';
 import * as sfx from './audio';
@@ -56,7 +56,7 @@ export class Fx {
     this.particles.push({ vx: 0, vy: 0, size: 3, rot: Math.random() * 6.28, vr: 0, drag: 2, grow: 0, ...p, life, max: life });
   }
 
-  message(text: string, sub = '', color = '#ffd166', life = 2.2) {
+  message(text: string, sub = '', color = '#d8b04a', life = 2.2) {
     this.messages = this.messages.filter((m) => m.text !== text);
     this.messages.push({ text, sub, life, max: life, color });
     if (this.messages.length > 3) this.messages.shift();
@@ -78,7 +78,7 @@ export class Fx {
     }
     for (let i = 0; i < 12; i++) {
       const a = Math.random() * 6.28, s = rand(250, 600);
-      this.add({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, kind: 'spark', color: '#ffe08a', life: rand(0.2, 0.5), size: 2, drag: 3 });
+      this.add({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, kind: 'spark', color: '#e2d3ac', life: rand(0.2, 0.5), size: 2, drag: 3 });
     }
     this.add({ x, y, kind: 'ring', color: '#fff3c4', life: 0.35, size: r * 0.3, grow: r * 2.6 });
     this.add({ x, y, kind: 'glow', color: '#ff9a3c', life: 0.25, size: r * 1.1 });
@@ -90,10 +90,9 @@ export class Fx {
     const color = (id: string | null) => {
       const p = id ? g.players.get(id) : undefined;
       if (!p) return '#ccc';
-      if (p.team === 0) return '#7cc4ff';
-      if (p.team === 1) return '#ff7b7b';
-      const c = skinDef(p.skin).color;
-      return c.startsWith('#') ? c : '#ffd166';
+      if (p.team === 0) return '#8fb8de';
+      if (p.team === 1) return '#d9796e';
+      return p.id === local ? '#d8b04a' : p.bot ? '#c3c7cc' : '#e2d3ac';
     };
     switch (ev.e) {
       case 'shot': {
@@ -117,7 +116,7 @@ export class Fx {
         this.beams.push({ x: ev.x, y: ev.y, x2: ev.x2, y2: ev.y2, life: 0.3 });
         const [v, pan] = this.spatial(ev.x, ev.y);
         sfx.sfxShot('rail', v, pan);
-        for (let i = 0; i < 10; i++) this.add({ x: ev.x2, y: ev.y2, vx: rand(-200, 200), vy: rand(-200, 200), kind: 'spark', color: '#9ff6ff', life: 0.35, size: 2 });
+        for (let i = 0; i < 10; i++) this.add({ x: ev.x2, y: ev.y2, vx: rand(-200, 200), vy: rand(-200, 200), kind: 'spark', color: '#a6dbe4', life: 0.35, size: 2 });
         if (ev.p === local) this.shake = Math.min(14, this.shake + 4);
         break;
       }
@@ -125,12 +124,12 @@ export class Fx {
         const t = g.players.get(ev.t);
         const n = Math.min(10, 2 + ev.d / 8);
         for (let i = 0; i < n; i++) {
-          this.add({ x: ev.x, y: ev.y, vx: rand(-160, 160), vy: rand(-160, 160), kind: 'blood', color: t?.bot ? '#c73a3a' : '#d64545', life: rand(0.25, 0.5), size: rand(2, 4.5), drag: 6 });
+          this.add({ x: ev.x, y: ev.y, vx: rand(-160, 160), vy: rand(-160, 160), kind: 'blood', color: t?.bot ? '#7d241f' : '#8c2b24', life: rand(0.25, 0.5), size: rand(2, 4.5), drag: 6 });
         }
         const [v, pan] = this.spatial(ev.x, ev.y);
         if (ev.by === local && ev.t !== local) {
           this.hitMarker = 0.15;
-          this.text(ev.x, ev.y - 24, String(ev.d), ev.d >= 50 ? '#ffd166' : '#ffffff', ev.d >= 50 ? 20 : 15);
+          this.text(ev.x, ev.y - 24, String(ev.d), ev.d >= 50 ? '#d8b04a' : '#e8e8e8', ev.d >= 50 ? 16 : 13);
           sfx.sfxHit(0.6, pan, true);
         } else if (ev.t === local) {
           this.hurt = Math.min(1, this.hurt + 0.25 + ev.d / 120);
@@ -147,15 +146,14 @@ export class Fx {
         if (v) {
           for (let i = 0; i < 16; i++) {
             const a = Math.random() * 6.28, s = rand(80, 260);
-            this.add({ x: v.x, y: v.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, kind: 'blood', color: '#b92f2f', life: rand(0.4, 0.8), size: rand(3, 6), drag: 5 });
+            this.add({ x: v.x, y: v.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, kind: 'blood', color: '#7a221c', life: rand(0.4, 0.8), size: rand(3, 6), drag: 5 });
           }
-          this.add({ x: v.x, y: v.y, kind: 'ring', color: '#ffffff', life: 0.3, size: 10, grow: 160 });
-        }
+                  }
         if (ev.k === local && ev.v !== local) {
           this.myKills++;
           this.killMarker = 0.5;
           sfx.sfxKill(true);
-          if (v) this.text(v.x, v.y - 40, v.boss ? '+500 BOSS!' : '+100', '#7dff9a', 22);
+          if (v) this.text(v.x, v.y - 40, v.boss ? '+500' : '+100', '#9ccc96', 16);
         } else sfx.sfxKill(false);
         if (ev.v === local) this.hurt = 1;
         break;
@@ -197,9 +195,9 @@ export class Fx {
         sfx.sfxPickup(ev.kind);
         const p = g.local;
         if (!p) break;
-        if (ev.kind === 'health') this.text(p.x, p.y - 34, '+50 LP', '#7dff9a', 18);
-        else if (ev.kind === 'armor') this.text(p.x, p.y - 34, '+50 Rüstung', '#7cc4ff', 18);
-        else this.message(WEAPONS[p.wid].name, 'Waffe aufgehoben', '#ffd166', 1.6);
+        if (ev.kind === 'health') this.text(p.x, p.y - 34, '+50 LP', '#9ccc96', 18);
+        else if (ev.kind === 'armor') this.text(p.x, p.y - 34, '+50 Rüstung', '#8fb8de', 18);
+        else this.message(WEAPONS[p.wid].name, 'Waffe aufgehoben', '#d8b04a', 1.6);
         break;
       }
       case 'pk': {
@@ -209,25 +207,25 @@ export class Fx {
       }
       case 'spawn': {
         const p = g.players.get(ev.p);
-        if (p) this.add({ x: ev.x, y: ev.y, kind: 'ring', color: '#9be7ff', life: 0.5, size: 10, grow: 90 });
+        if (p) this.add({ x: ev.x, y: ev.y, kind: 'ring', color: '#9fbfcf', life: 0.5, size: 10, grow: 90 });
         if (ev.p === local) this.hurt = 0;
         break;
       }
       case 'join': {
-        if (!ev.pl.bot) this.feed.push({ kn: '', kc: '#ccc', vn: ev.pl.name, vc: '#7dff9a', w: '', t: 4, mine: false, info: 'ist beigetreten' });
+        if (!ev.pl.bot) this.feed.push({ kn: '', kc: '#ccc', vn: ev.pl.name, vc: '#9ccc96', w: '', t: 4, mine: false, info: 'ist beigetreten' });
         break;
       }
       case 'leave': {
         const p = g.players.get(ev.p);
-        if (p && !p.bot) this.feed.push({ kn: '', kc: '#ccc', vn: p.name, vc: '#ff9a9a', w: '', t: 4, mine: false, info: 'hat das Spiel verlassen' });
+        if (p && !p.bot) this.feed.push({ kn: '', kc: '#ccc', vn: p.name, vc: '#d9958c', w: '', t: 4, mine: false, info: 'hat das Spiel verlassen' });
         break;
       }
       case 'wave':
-        this.message(`Welle ${ev.n}`, ev.boss ? '⚠ BOSS-WELLE ⚠' : 'Haltet durch!', ev.boss ? '#ff6b6b' : '#ffd166', 2.8);
+        this.message(`Welle ${ev.n}`, ev.boss ? 'Schwer gepanzerter Gegner im Anmarsch' : 'Feindkontakt', ev.boss ? '#d9796e' : '#d8b04a', 2.8);
         sfx.sfxUi('wave');
         break;
       case 'msg':
-        this.message(ev.text, '', '#ffd166', 2.2);
+        this.message(ev.text, '', '#d8b04a', 2.2);
         break;
       case 'empty':
         if (ev.p === local) sfx.sfxEmpty();

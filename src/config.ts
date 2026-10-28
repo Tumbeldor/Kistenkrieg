@@ -70,51 +70,53 @@ export const WEAPON_LIST: WeaponId[] = ['pistol', 'smg', 'shotgun', 'rifle', 'sn
 export const PICKUP_WEAPONS: WeaponId[] = ['shotgun', 'sniper', 'flamer', 'minigun', 'rocket', 'rail'];
 
 export type PerkId = 'none' | 'tough' | 'swift' | 'reload' | 'mag' | 'vamp' | 'regen' | 'blast';
-export interface PerkDef { id: PerkId; name: string; desc: string; unlock: number; icon: string }
+export interface PerkDef { id: PerkId; name: string; desc: string; unlock: number }
 export const PERKS: PerkDef[] = [
-  { id: 'none', name: 'Kein Perk', desc: 'Ganz ohne Extras.', unlock: 1, icon: '–' },
-  { id: 'tough', name: 'Zäh', desc: '+25 maximale Lebenspunkte.', unlock: 4, icon: '🛡️' },
-  { id: 'swift', name: 'Flink', desc: '+12 % Laufgeschwindigkeit.', unlock: 6, icon: '👟' },
-  { id: 'reload', name: 'Schnelllader', desc: 'Nachladen 35 % schneller.', unlock: 9, icon: '⚡' },
-  { id: 'mag', name: 'Großes Magazin', desc: '+40 % Magazingröße.', unlock: 12, icon: '📦' },
-  { id: 'vamp', name: 'Vampir', desc: '+25 LP für jede Eliminierung.', unlock: 15, icon: '🦇' },
-  { id: 'regen', name: 'Regeneration', desc: 'Heilt 6 LP/s, wenn du 4 s keinen Schaden nimmst.', unlock: 19, icon: '💚' },
-  { id: 'blast', name: 'Sprengmeister', desc: 'Kein Eigenschaden durch Explosionen, +25 % Radius.', unlock: 23, icon: '💥' },
+  { id: 'none', name: 'Kein Perk', desc: 'Standardausrüstung ohne Extras.', unlock: 1 },
+  { id: 'tough', name: 'Abgehärtet', desc: '+25 maximale Lebenspunkte.', unlock: 4 },
+  { id: 'swift', name: 'Leichtes Gepäck', desc: '+12 % Laufgeschwindigkeit.', unlock: 6 },
+  { id: 'reload', name: 'Schnellladen', desc: 'Nachladen 35 % schneller.', unlock: 9 },
+  { id: 'mag', name: 'Erweiterte Magazine', desc: '+40 % Magazingröße.', unlock: 12 },
+  { id: 'vamp', name: 'Adrenalin', desc: '+25 LP für jede Eliminierung.', unlock: 15 },
+  { id: 'regen', name: 'Feldsanitäter', desc: 'Heilt 6 LP/s, wenn du 4 s keinen Schaden nimmst.', unlock: 19 },
+  { id: 'blast', name: 'Sprengstoffexperte', desc: 'Kein Eigenschaden durch Explosionen, +25 % Radius.', unlock: 23 },
 ];
 export const perkDef = (id: string): PerkDef => PERKS.find((p) => p.id === id) ?? PERKS[0];
 
-export interface SkinDef { id: string; name: string; color: string; unlock: number }
+/** Uniform camouflage: base colour plus pattern colours. `color` is the representative colour for UI. */
+export type CamoPattern = 'plain' | 'blotch' | 'digital' | 'stripe';
+export interface SkinDef { id: string; name: string; color: string; spots: string[]; pattern: CamoPattern; unlock: number }
 export const SKINS: SkinDef[] = [
-  { id: 'blue', name: 'Blau', color: '#3b82f6', unlock: 1 },
-  { id: 'green', name: 'Grün', color: '#22c55e', unlock: 1 },
-  { id: 'orange', name: 'Orange', color: '#f97316', unlock: 1 },
-  { id: 'purple', name: 'Lila', color: '#a855f7', unlock: 2 },
-  { id: 'pink', name: 'Pink', color: '#ec4899', unlock: 3 },
-  { id: 'teal', name: 'Türkis', color: '#14b8a6', unlock: 5 },
-  { id: 'gold', name: 'Gold', color: '#eab308', unlock: 7 },
-  { id: 'red', name: 'Rot', color: '#ef4444', unlock: 9 },
-  { id: 'white', name: 'Schnee', color: '#e8eef7', unlock: 11 },
-  { id: 'black', name: 'Schatten', color: '#232a36', unlock: 13 },
-  { id: 'lime', name: 'Limette', color: '#a3e635', unlock: 16 },
-  { id: 'rainbow', name: 'Regenbogen', color: 'rainbow', unlock: 25 },
-  { id: 'chrome', name: 'Chrom', color: 'chrome', unlock: 30 },
+  { id: 'woodland', name: 'Woodland', color: '#4f5b3c', spots: ['#2f3826', '#6e6a47', '#1e2219'], pattern: 'blotch', unlock: 1 },
+  { id: 'desert', name: 'Wüste', color: '#b19d76', spots: ['#8c7752', '#cdbb93'], pattern: 'blotch', unlock: 1 },
+  { id: 'urban', name: 'Urban', color: '#686d74', spots: ['#474b52', '#8a8f96'], pattern: 'blotch', unlock: 1 },
+  { id: 'olive', name: 'Oliv', color: '#566238', spots: [], pattern: 'plain', unlock: 2 },
+  { id: 'navy', name: 'Marine', color: '#2e3d52', spots: ['#1f2a3a', '#3e5068'], pattern: 'digital', unlock: 3 },
+  { id: 'black', name: 'Schwarz', color: '#25282d', spots: [], pattern: 'plain', unlock: 5 },
+  { id: 'winter', name: 'Winter', color: '#c9ced4', spots: ['#9ea6b0', '#e6e9ec'], pattern: 'blotch', unlock: 7 },
+  { id: 'digital', name: 'Digital', color: '#5d6648', spots: ['#3c4430', '#7c7a5a', '#2a2f22'], pattern: 'digital', unlock: 9 },
+  { id: 'tiger', name: 'Tigerstreifen', color: '#5a6040', spots: ['#262a1c', '#7a6f4a'], pattern: 'stripe', unlock: 11 },
+  { id: 'arid', name: 'Steppe', color: '#8f8462', spots: ['#6b6248', '#a89c76', '#5a4f3a'], pattern: 'digital', unlock: 13 },
+  { id: 'night', name: 'Nachtjäger', color: '#1d2430', spots: ['#141a22', '#2b3646'], pattern: 'stripe', unlock: 16 },
+  { id: 'elite', name: 'Elite Schwarz-Gold', color: '#1f2024', spots: ['#8a7334'], pattern: 'stripe', unlock: 25 },
+  { id: 'titan', name: 'Titan', color: '#7d848c', spots: ['#5d636b', '#a2a9b1'], pattern: 'digital', unlock: 30 },
 ];
 export const skinDef = (id: string): SkinDef => SKINS.find((s) => s.id === id) ?? SKINS[0];
 
 export interface HatDef { id: string; name: string; unlock: number }
 export const HATS: HatDef[] = [
   { id: 'none', name: 'Ohne', unlock: 1 },
-  { id: 'cap', name: 'Kappe', unlock: 2 },
-  { id: 'band', name: 'Stirnband', unlock: 5 },
-  { id: 'party', name: 'Partyhut', unlock: 8 },
-  { id: 'horns', name: 'Hörner', unlock: 10 },
-  { id: 'tophat', name: 'Zylinder', unlock: 13 },
-  { id: 'antenna', name: 'Antenne', unlock: 16 },
-  { id: 'viking', name: 'Wikinger', unlock: 18 },
-  { id: 'halo', name: 'Heiligenschein', unlock: 21 },
-  { id: 'crown', name: 'Krone', unlock: 24 },
-  { id: 'ninja', name: 'Ninja', unlock: 27 },
-  { id: 'fire', name: 'Feuerkopf', unlock: 29 },
+  { id: 'cap', name: 'Basecap', unlock: 2 },
+  { id: 'beanie', name: 'Mütze', unlock: 5 },
+  { id: 'headset', name: 'Headset', unlock: 8 },
+  { id: 'beret', name: 'Barett', unlock: 10 },
+  { id: 'boonie', name: 'Boonie-Hut', unlock: 13 },
+  { id: 'helmet', name: 'Gefechtshelm', unlock: 16 },
+  { id: 'balaclava', name: 'Sturmhaube', unlock: 18 },
+  { id: 'nvg', name: 'Nachtsichtgerät', unlock: 21 },
+  { id: 'gasmask', name: 'Gasmaske', unlock: 24 },
+  { id: 'tactical', name: 'Taktischer Helm', unlock: 27 },
+  { id: 'officer', name: 'Schirmmütze', unlock: 29 },
 ];
 
 export type DiffId = 'easy' | 'normal' | 'hard' | 'insane';
@@ -198,20 +200,20 @@ export function levelInfo(totalXp: number): { level: number; into: number; need:
 
 export const XP = { kill: 100, finish: 100, win: 300, second: 150, third: 75, wave: 80, online: 0.2 };
 
-export interface Unlock { level: number; kind: 'Waffe' | 'Perk' | 'Farbe' | 'Hut'; name: string }
+export interface Unlock { level: number; kind: 'Waffe' | 'Perk' | 'Tarnung' | 'Kopfbedeckung'; name: string }
 export function allUnlocks(): Unlock[] {
   const list: Unlock[] = [];
   for (const id of WEAPON_LIST) list.push({ level: WEAPONS[id].unlock, kind: 'Waffe', name: WEAPONS[id].name });
   for (const p of PERKS) if (p.id !== 'none') list.push({ level: p.unlock, kind: 'Perk', name: p.name });
-  for (const s of SKINS) list.push({ level: s.unlock, kind: 'Farbe', name: s.name });
-  for (const h of HATS) if (h.id !== 'none') list.push({ level: h.unlock, kind: 'Hut', name: h.name });
+  for (const s of SKINS) list.push({ level: s.unlock, kind: 'Tarnung', name: s.name });
+  for (const h of HATS) if (h.id !== 'none') list.push({ level: h.unlock, kind: 'Kopfbedeckung', name: h.name });
   return list.filter((u) => u.level > 1).sort((a, b) => a.level - b.level);
 }
 
 export const BOT_NAMES = [
-  'Kevin', 'Jürgen', 'Heidi', 'Uwe', 'Svenja', 'Horst', 'Gabi', 'Dieter', 'Lena', 'Klaus', 'Bärbel', 'Günther',
-  'Mia', 'Detlef', 'Ute', 'Ronny', 'Chantal', 'Helmut', 'Jana', 'Torsten', 'Gisela', 'Bernd', 'Nina', 'Olaf',
+  'Falke', 'Wolf', 'Viper', 'Adler', 'Fuchs', 'Luchs', 'Bär', 'Kobra', 'Specht', 'Hammer', 'Sturm', 'Eisen',
+  'Schatten', 'Rabe', 'Keiler', 'Habicht', 'Dachs', 'Marder', 'Kranich', 'Wiesel', 'Granit', 'Orkan', 'Blitz', 'Echo',
 ];
 
-export const TEAM_COLORS = ['#4aa3ff', '#ff5a5a'];
+export const TEAM_COLORS = ['#5b9bd5', '#cf5a4f'];
 export const TEAM_NAMES = ['Team Blau', 'Team Rot'];

@@ -94,11 +94,11 @@ export function renderSettingsForm(root: HTMLElement, s: MatchSettings, editable
 
   const two = el('div', 'two-col');
   root.append(two);
-  seg('Karte', [{ v: 'random', t: '🎲 Zufall' }, ...MAP_LIST.map((m) => ({ v: m, t: MAPS[m].name }))], s.map as string, (v) => set({ map: v as MatchSettings['map'] }), two);
+  seg('Karte', [{ v: 'random', t: 'Zufall' }, ...MAP_LIST.map((m) => ({ v: m, t: MAPS[m].name }))], s.map as string, (v) => set({ map: v as MatchSettings['map'] }), two);
   seg('Kartengröße', MAP_SIZE_LIST.map((z) => ({ v: z.id, t: z.name })), (s.mapSize ?? 'auto') as string, (v) => set({ mapSize: v as MapSizeId }), two);
   const room = Math.max(0, MAX_TOTAL - Math.max(humans, 1));
   if (online && s.mode === 'dm') {
-    seg('Gegner', [{ v: 0, t: '👥 Nur Freunde' }, { v: 1, t: '🤖 Mit Bots' }], noBots ? 0 : 1,
+    seg('Gegner', [{ v: 0, t: 'Nur Freunde' }, { v: 1, t: 'Mit Bots' }], noBots ? 0 : 1,
       (v) => set({ bots: v === 0 ? 0 : Math.max(1, Math.min(4, room)) }), two);
   }
   if (!noBots) seg('Schwierigkeit (Bots)', DIFF_LIST.map((d) => ({ v: d, t: DIFFS[d].name })), s.diff as string, (v) => set({ diff: v as MatchSettings['diff'] }), two);
@@ -123,7 +123,7 @@ export function renderSettingsForm(root: HTMLElement, s: MatchSettings, editable
 export function nextUnlockText(p: Profile): string {
   const lv = level(p);
   const next = allUnlocks().filter((u) => u.level > lv);
-  if (!next.length) return 'Alles freigeschaltet – du bist eine Legende! 🏆';
+  if (!next.length) return 'Alles freigeschaltet.';
   const n = next[0].level;
   const items = next.filter((u) => u.level === n).map((u) => `${u.kind} <b>${esc(u.name)}</b>`);
   return `Nächste Freischaltung bei Lv ${n}: ${items.join(', ')}`;
@@ -141,9 +141,10 @@ export function renderMenuProfile(p: Profile) {
 
 // ---------------------------------------------------------------- loadout
 
-export function renderLoadout(p: Profile, onChange: () => void, drawGun: (c: HTMLCanvasElement, w: WeaponId) => void, drawHat: (c: HTMLCanvasElement, hat: string, skin: string) => void) {
+export function renderLoadout(p: Profile, onChange: () => void, drawGun: (c: HTMLCanvasElement, w: WeaponId) => void,
+  drawHat: (c: HTMLCanvasElement, hat: string, skin: string) => void, drawCamo: (c: HTMLCanvasElement, skin: string) => void) {
   const lv = level(p);
-  const lockTag = (need: number) => (need > lv ? `<span class="lock">🔒 Lv ${need}</span>` : '');
+  const lockTag = (need: number) => (need > lv ? `<span class="lock">Lv ${need}</span>` : '');
   // weapons
   const wg = $('lo-weapons');
   wg.innerHTML = '';
@@ -174,7 +175,7 @@ export function renderLoadout(p: Profile, onChange: () => void, drawGun: (c: HTM
   pg.innerHTML = '';
   for (const k of PERKS) {
     const locked = k.unlock > lv;
-    const b = el('button', 'item' + (p.perk === k.id ? ' on' : '') + (locked ? ' locked' : ''), `${lockTag(k.unlock)}<b>${k.icon} ${k.name}</b><div class="desc">${k.desc}</div>`);
+    const b = el('button', 'item' + (p.perk === k.id ? ' on' : '') + (locked ? ' locked' : ''), `${lockTag(k.unlock)}<b>${k.name}</b><div class="desc">${k.desc}</div>`);
     b.onclick = () => { if (!locked) { p.perk = k.id; onChange(); } };
     pg.append(b);
   }
@@ -183,9 +184,12 @@ export function renderLoadout(p: Profile, onChange: () => void, drawGun: (c: HTM
   sg.innerHTML = '';
   for (const s of SKINS) {
     const locked = s.unlock > lv;
-    const bg = s.color === 'rainbow' ? 'linear-gradient(135deg,#f44,#fb3,#4d4,#4af,#a4f)' : s.color === 'chrome' ? 'linear-gradient(135deg,#eef,#889,#dde,#778)' : s.color;
-    const b = el('button', 'item swatch' + (p.skin === s.id ? ' on' : '') + (locked ? ' locked' : ''), `${lockTag(s.unlock)}${s.name}`);
-    b.style.background = bg;
+    const b = el('button', 'item swatch' + (p.skin === s.id ? ' on' : '') + (locked ? ' locked' : ''));
+    const c = el('canvas', 'camo');
+    c.width = 120; c.height = 72;
+    b.append(c);
+    b.insertAdjacentHTML('beforeend', `${lockTag(s.unlock)}<span>${s.name}</span>`);
+    drawCamo(c, s.id);
     b.onclick = () => { if (!locked) { p.skin = s.id; onChange(); } };
     sg.append(b);
   }
@@ -236,8 +240,7 @@ export function renderLobby(members: LobbyMember[], myId: string, isHost: boolea
   ul.innerHTML = '';
   for (const m of members) {
     const li = el('li');
-    const skin = SKINS.find((s) => s.id === m.skin)?.color ?? '#888';
-    const dotBg = skin === 'rainbow' ? 'linear-gradient(135deg,#f44,#fb3,#4d4,#4af)' : skin === 'chrome' ? '#ccd' : skin;
+    const dotBg = SKINS.find((s) => s.id === m.skin)?.color ?? '#888';
     li.innerHTML = `<span class="dot" style="background:${dotBg}"></span><span class="nm">${esc(m.name)}${m.id === myId ? ' (du)' : ''}</span>
       <span class="tag">Lv ${m.level} · ${WEAPONS[m.primary]?.name ?? ''}</span>${m.host ? '<span class="host">HOST</span>' : ''}`;
     ul.append(li);
@@ -254,9 +257,9 @@ export function renderResults(res: MatchResult, myId: string, rep: XpReport | nu
   let t = 'Match vorbei';
   let cls = '';
   if (res.mode === 'dm') {
-    if (row?.place === 1) { t = '🏆 Sieg!'; cls = 'win'; } else { t = `Platz ${row?.place ?? '-'}`; cls = row && row.place <= 3 ? '' : 'lose'; }
+    if (row?.place === 1) { t = 'Sieg'; cls = 'win'; } else { t = `Platz ${row?.place ?? '-'}`; cls = row && row.place <= 3 ? '' : 'lose'; }
   } else if (res.mode === 'team') {
-    if (res.winnerTeam === 0) { t = '🏆 Teamsieg!'; cls = 'win'; } else if (res.winnerTeam === null) t = 'Unentschieden'; else { t = 'Niederlage'; cls = 'lose'; }
+    if (res.winnerTeam === 0) { t = 'Teamsieg'; cls = 'win'; } else if (res.winnerTeam === null) t = 'Unentschieden'; else { t = 'Niederlage'; cls = 'lose'; }
   } else {
     t = `${res.wave} ${res.wave === 1 ? 'Welle' : 'Wellen'} überlebt`;
     cls = res.wave >= 5 ? 'win' : '';

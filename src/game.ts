@@ -127,7 +127,7 @@ export interface GameOptions {
 }
 
 const PICKUP_RESPAWN: Record<PickupKind, number> = { health: 18, armor: 25, weapon: 22 };
-const BOSS_NAMES = ['Brutus', 'Grobian', 'Koloss', 'Titan', 'Panzer-Paul'];
+const BOSS_NAMES = ['Juggernaut', 'Koloss', 'Bollwerk', 'Titan', 'Rammbock'];
 
 export const sameTeam = (a: { team: number }, b: { team: number }) => a.team >= 0 && a.team === b.team;
 
@@ -239,15 +239,15 @@ export class Game {
     let name = pick(BOT_NAMES);
     for (let i = 0; i < 6 && this.usedNames.has(name); i++) name = pick(BOT_NAMES);
     this.usedNames.add(name);
-    if (opts.boss) name = 'BOSS ' + pick(BOSS_NAMES);
+    if (opts.boss) name = pick(BOSS_NAMES);
     const diff = this.settings.diff;
     const pool: WeaponId[] = diff === 'easy' ? ['pistol', 'smg', 'smg', 'shotgun'] : diff === 'normal' ? ['smg', 'rifle', 'shotgun', 'pistol', 'smg']
       : diff === 'hard' ? ['smg', 'rifle', 'shotgun', 'rifle', 'sniper', 'minigun'] : ['rifle', 'shotgun', 'sniper', 'minigun', 'rocket', 'rail', 'smg'];
-    const skins = ['red', 'orange', 'purple', 'gold', 'pink', 'teal', 'lime', 'white', 'black'];
-    const hats = ['none', 'none', 'cap', 'band', 'horns', 'party', 'tophat', 'antenna', 'viking'];
+    const skins = ['woodland', 'desert', 'urban', 'olive', 'navy', 'black', 'digital', 'tiger', 'arid'];
+    const hats = ['none', 'cap', 'beanie', 'headset', 'helmet', 'helmet', 'boonie', 'beret', 'balaclava'];
     const info: PlayerInfo = {
-      id: 'b' + ++this.botSeq, name: opts.boss ? name : 'Bot ' + name, bot: true, team,
-      skin: opts.boss ? 'black' : pick(skins), hat: opts.boss ? 'crown' : pick(hats), level: 0, perk: 'none',
+      id: 'b' + ++this.botSeq, name: opts.boss ? name : 'KI-' + name, bot: true, team,
+      skin: opts.boss ? 'black' : pick(skins), hat: opts.boss ? 'tactical' : pick(hats), level: 0, perk: 'none',
       primary: opts.weapon ?? pick(pool), boss: opts.boss, hpMul: (opts.hpMul ?? 1) * DIFFS[diff].hpMul,
     };
     return this.addPlayer(info, true);
@@ -596,8 +596,7 @@ export class Game {
       if (k.perk === 'vamp' && k.alive) k.hp = Math.min(k.maxHp, k.hp + 25);
       if (k.team === 0 || k.team === 1) this.teamKills[k.team]++;
       if (k.streak === 3 || k.streak === 5 || k.streak === 8) {
-        const label = k.streak === 3 ? 'ist im Rausch!' : k.streak === 5 ? 'ist nicht zu stoppen!' : 'ist GÖTTLICH!';
-        this.emit({ e: 'msg', text: `${k.name} ${label}` });
+        this.emit({ e: 'msg', text: `${k.name}: ${k.streak} Eliminierungen in Folge` });
       }
     } else {
       v.score = Math.max(0, v.score - 50);

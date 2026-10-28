@@ -23,7 +23,7 @@ const KEY = 'kistenkrieg.profile.v1';
 function fresh(): Profile {
   const n = Math.floor(Math.random() * 900 + 100);
   return {
-    v: 1, name: `Spieler${n}`, xp: 0, skin: 'blue', hat: 'none', primary: 'smg', perk: 'none',
+    v: 1, name: `Spieler${n}`, xp: 0, skin: 'woodland', hat: 'none', primary: 'smg', perk: 'none',
     stats: { kills: 0, deaths: 0, matches: 0, wins: 0, bestWave: 0, playTime: 0 },
     settings: { volume: 0.7, showFps: false, aimAssist: true },
   };
@@ -50,7 +50,7 @@ export function sanitize(raw: unknown): Profile {
   const lvl = levelInfo(p.xp).level;
   if (WEAPONS[p.primary].unlock > lvl) p.primary = 'smg';
   if ((PERKS.find((x) => x.id === p.perk)?.unlock ?? 1) > lvl) p.perk = 'none';
-  if ((SKINS.find((x) => x.id === p.skin)?.unlock ?? 1) > lvl) p.skin = 'blue';
+  if ((SKINS.find((x) => x.id === p.skin)?.unlock ?? 1) > lvl) p.skin = 'woodland';
   if ((HATS.find((x) => x.id === p.hat)?.unlock ?? 1) > lvl) p.hat = 'none';
   return p;
 }

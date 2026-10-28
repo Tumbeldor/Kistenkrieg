@@ -7,7 +7,7 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Kistenkrieg" />
-    <meta name="theme-color" content="#0b0f17" />
+    <meta name="theme-color" content="#0c0e11" />
     <meta name="description" content="Kistenkrieg – Top-Down-Shooter im Browser. Solo gegen Bots oder online mit Freunden, auf PC und iPhone." />
     <title>Kistenkrieg</title>
     <link rel="manifest" href="manifest.webmanifest" />
@@ -15,7 +15,7 @@
     <link rel="apple-touch-icon" href="apple-touch-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Russo+One&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;600&display=swap" rel="stylesheet" />
   </head>
   <body>
     <canvas id="game"></canvas>
@@ -26,10 +26,15 @@
       <section class="screen" id="scr-menu">
         <div class="menu-wrap">
           <div class="brand">
-            <div class="logo-crate" aria-hidden="true"></div>
+            <svg viewBox="0 0 64 64" aria-hidden="true">
+              <rect x="6" y="6" width="52" height="52" fill="none" stroke="#c9a646" stroke-width="3" />
+              <circle cx="32" cy="32" r="15" fill="none" stroke="#e4e6e9" stroke-width="2.5" />
+              <path d="M32 10v14M32 40v14M10 32h14M40 32h14" stroke="#e4e6e9" stroke-width="2.5" />
+              <circle cx="32" cy="32" r="2.5" fill="#c9a646" />
+            </svg>
             <div>
-              <h1>KISTENKRIEG</h1>
-              <p class="tagline">Top-Down-Shooter · Solo · Koop · Online</p>
+              <h1>Kistenkrieg</h1>
+              <p class="tagline">Taktischer Top-Down-Shooter</p>
             </div>
           </div>
           <div class="menu-grid">
@@ -44,15 +49,15 @@
               </div>
             </div>
             <div class="menu-buttons">
-              <button class="btn primary big" data-go="solo">▶ Solo spielen</button>
-              <button class="btn accent big" data-go="online">👥 Mit Freunden</button>
-              <button class="btn" data-go="loadout">🎒 Ausrüstung</button>
-              <button class="btn" data-go="progress">🏅 Fortschritt</button>
-              <button class="btn" data-go="settings">⚙️ Einstellungen</button>
-              <button class="btn" data-go="help">❓ Steuerung</button>
+              <button class="btn primary big" data-go="solo">Solo spielen</button>
+              <button class="btn accent big" data-go="online">Mit Freunden spielen</button>
+              <button class="btn" data-go="loadout">Ausrüstung</button>
+              <button class="btn" data-go="progress">Fortschritt</button>
+              <button class="btn" data-go="settings">Einstellungen</button>
+              <button class="btn" data-go="help">Steuerung</button>
             </div>
           </div>
-          <p class="hint" id="ios-hint">📱 iPhone-Tipp: In Safari auf <b>Teilen → Zum Home-Bildschirm</b> tippen – dann läuft das Spiel im Vollbild. Querformat empfohlen.</p>
+          <p class="hint" id="ios-hint">iPhone-Tipp: In Safari auf <b>Teilen → Zum Home-Bildschirm</b> tippen – dann läuft das Spiel im Vollbild. Querformat empfohlen.</p>
         </div>
       </section>
 
@@ -61,7 +66,7 @@
         <div class="panel wide">
           <header class="panel-head"><button class="back" data-go="menu">←</button><h2>Solo-Match</h2></header>
           <div id="solo-settings" class="settings-form"></div>
-          <div class="actions"><button class="btn primary big" id="solo-start">▶ Match starten</button></div>
+          <div class="actions"><button class="btn primary big" id="solo-start">Match starten</button></div>
         </div>
       </section>
 
@@ -102,18 +107,18 @@
                 <span class="muted">Raumcode</span>
                 <div class="room-code" id="lobby-code">----</div>
                 <div class="row">
-                  <button class="btn small accent" id="btn-share">🔗 Link teilen</button>
+                  <button class="btn small accent" id="btn-share">Link teilen</button>
                   <button class="btn small" id="btn-copy">Code kopieren</button>
                 </div>
               </div>
               <h3>Spieler <span class="muted" id="lobby-count"></span></h3>
               <ul class="members" id="lobby-members"></ul>
-              <button class="btn small" data-go="loadout">🎒 Ausrüstung ändern</button>
+              <button class="btn small" data-go="loadout">Ausrüstung ändern</button>
             </div>
             <div class="lobby-right">
               <div id="lobby-settings" class="settings-form"></div>
               <div class="actions">
-                <button class="btn primary big" id="lobby-start">▶ Spiel starten</button>
+                <button class="btn primary big" id="lobby-start">Spiel starten</button>
                 <p class="status" id="lobby-wait">Warte, bis der Host das Spiel startet …</p>
               </div>
             </div>
@@ -129,9 +134,9 @@
           <div class="grid weapons" id="lo-weapons"></div>
           <h3>Perk</h3>
           <div class="grid perks" id="lo-perks"></div>
-          <h3>Farbe</h3>
+          <h3>Tarnmuster</h3>
           <div class="grid swatches" id="lo-skins"></div>
-          <h3>Hut</h3>
+          <h3>Kopfbedeckung</h3>
           <div class="grid hats" id="lo-hats"></div>
         </div>
       </section>
@@ -178,7 +183,7 @@
           <header class="panel-head"><button class="back" id="help-back">←</button><h2>Steuerung</h2></header>
           <div class="help-grid">
             <div class="card">
-              <h3>🖥️ PC</h3>
+              <h3>PC</h3>
               <table class="keys">
                 <tr><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></td><td>Laufen</td></tr>
                 <tr><td>Maus</td><td>Zielen</td></tr>
@@ -190,7 +195,7 @@
               </table>
             </div>
             <div class="card">
-              <h3>📱 iPhone</h3>
+              <h3>iPhone</h3>
               <table class="keys">
                 <tr><td>Linker Daumen</td><td>Laufen (überall auf der linken Hälfte)</td></tr>
                 <tr><td>Rechter Daumen</td><td>Zielen – weit ziehen = feuern</td></tr>
@@ -202,11 +207,11 @@
           <div class="card tips">
             <h3>Tipps</h3>
             <ul>
-              <li>🌳 In <b>Büschen</b> bist du für Gegner unsichtbar – bis du schießt oder sie ganz nah sind.</li>
-              <li>📦 <b>Holzkisten</b> blocken Kugeln, gehen aber kaputt. Metallkisten halten alles aus.</li>
-              <li>🛢️ Rote <b>Fässer</b> explodieren – lock Gegner daneben!</li>
-              <li>✚ Medikits, 🛡️ Rüstung und ⭐ Spezialwaffen liegen auf leuchtenden Plätzen.</li>
-              <li>🏅 Jede Eliminierung bringt XP. Mit neuen Leveln schaltest du Waffen, Perks, Farben und Hüte frei.</li>
+              <li>In <b>Büschen</b> und unter Tarnnetzen bist du für Gegner unsichtbar – bis du schießt oder sie ganz nah sind.</li>
+              <li><b>Holzkisten</b> blocken Kugeln, gehen aber kaputt. Metallkisten halten alles aus.</li>
+              <li>Rote <b>Fässer</b> explodieren – nutze sie gegen Gegner in der Nähe.</li>
+              <li>Sanitätskästen, Schutzwesten und Spezialwaffen liegen auf markierten Plätzen.</li>
+              <li>Jede Eliminierung bringt XP. Mit neuen Leveln schaltest du Waffen, Perks, Tarnmuster und Kopfbedeckungen frei.</li>
             </ul>
           </div>
         </div>
@@ -219,8 +224,8 @@
           <p class="muted" id="pause-note"></p>
           <div class="col">
             <button class="btn primary" id="pause-resume">Weiter</button>
-            <button class="btn" id="pause-loadout">🎒 Ausrüstung (ab nächstem Respawn)</button>
-            <button class="btn" id="pause-help">❓ Steuerung</button>
+            <button class="btn" id="pause-loadout">Ausrüstung (ab nächstem Respawn)</button>
+            <button class="btn" id="pause-help">Steuerung</button>
             <button class="btn danger" id="pause-quit">Match verlassen</button>
           </div>
         </div>

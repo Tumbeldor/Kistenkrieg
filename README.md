@@ -10,7 +10,7 @@ Top-Down-Shooter für den Browser – am PC und auf dem iPhone. Solo gegen Bots 
 - **Bots** in 4 Schwierigkeitsstufen (Leicht, Normal, Schwer, Albtraum) mit Pfadsuche, Deckung und Medikit-Suche
 - **9 Waffen:** Pistole, MP, Schrotflinte, Sturmgewehr, Scharfschützengewehr, Flammenwerfer, Minigun, Raketenwerfer, Railgun
 - **Karten:** Lagerhalle, Wald, Wüste in den Größen Klein, Mittel und Groß (oder automatisch nach Spielerzahl) – jedes Match zufällig generiert, mit zerstörbaren Kisten, Explosivfässern und Büschen zum Verstecken
-- **Progression:** XP und 30 Level; freischaltbare Waffen, Perks, Farben und Hüte; Statistiken; Spielstand-Code zum Übertragen
+- **Progression:** XP und 30 Level; freischaltbare Waffen, Perks, Tarnmuster und Kopfbedeckungen; Statistiken; Spielstand-Code zum Übertragen
 - **Online:** Raum erstellen → Link oder 4-stelligen Code an Freunde schicken. Verbindung direkt zwischen den Geräten (WebRTC über PeerJS), kein eigener Server nötig
 - **iPhone:** Touch-Steuerung mit zwei virtuellen Sticks; über „Zum Home-Bildschirm“ im Vollbild
 
