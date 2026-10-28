@@ -239,11 +239,19 @@ function generate(m: GameMap, rng: Rng): void {
   const wallRects: Rect[] = [];
   const blockers: Rect[] = []; // everything solid placed so far (for spacing)
   const wt = 28;
-  const nStruct = n(theme === 'lager' ? 11 : theme === 'wueste' ? 8 : 4);
+  // per-theme layout: wall structures, round obstacles (trees/rocks), crate clusters, barrels, bushes
+  const P = {
+    lager: { struct: 11, tpl: ['line', 'line', 'L', 'U', 'room', 'T'], rocks: 0, rockR: [20, 32], clusters: 22, steel: 0.2, barrels: 7, bush: 9 },
+    wald: { struct: 4, tpl: ['line', 'L', 'U', 'L', 'T'], rocks: 26, rockR: [24, 40], clusters: 11, steel: 0, barrels: 4, bush: 24 },
+    wueste: { struct: 8, tpl: ['line', 'L', 'U', 'L', 'T'], rocks: 10, rockR: [20, 32], clusters: 14, steel: 0.1, barrels: 9, bush: 10 },
+    winter: { struct: 5, tpl: ['line', 'L', 'U', 'L', 'T'], rocks: 20, rockR: [22, 36], clusters: 12, steel: 0.05, barrels: 5, bush: 16 },
+    stadt: { struct: 13, tpl: ['room', 'room', 'U', 'L', 'line', 'T'], rocks: 0, rockR: [20, 32], clusters: 16, steel: 0.35, barrels: 8, bush: 7 },
+  }[theme];
+  const nStruct = n(P.struct);
   for (let attempt = 0, placed = 0; attempt < 200 && placed < nStruct; attempt++) {
     const cx = rng.range(260, W - 260);
     const cy = rng.range(260, H - 260);
-    const type = rng.pick(theme === 'lager' ? ['line', 'line', 'L', 'U', 'room', 'T'] : ['line', 'L', 'U', 'L', 'T']);
+    const type = rng.pick(P.tpl);
     const rects: Rect[] = [];
     const len = rng.range(180, 420);
     const horiz = rng.chance(0.5);
@@ -299,9 +307,9 @@ function generate(m: GameMap, rng: Rng): void {
   }
 
   // Round solids: trees / rocks / cacti
-  const nRocks = n(theme === 'wald' ? 26 : theme === 'wueste' ? 10 : 0);
+  const nRocks = n(P.rocks);
   for (let i = 0, a = 0; i < nRocks && a < 400; a++) {
-    const r = theme === 'wald' ? rng.range(24, 40) : rng.range(20, 32);
+    const r = rng.range(P.rockR[0], P.rockR[1]);
     const x = rng.range(T + 90, W - T - 90);
     const y = rng.range(T + 90, H - T - 90);
     const box = { x: x - r, y: y - r, w: r * 2, h: r * 2 };
@@ -317,7 +325,7 @@ function generate(m: GameMap, rng: Rng): void {
     [[0, 0]], [[0, 0], [1, 0]], [[0, 0], [0, 1]], [[0, 0], [1, 0], [0, 1], [1, 1]], [[0, 0], [1, 0], [2, 0]],
     [[0, 0], [1, 0], [0, 1]], [[0, 0], [1, 0], [2, 0], [1, 1]], [[0, 0], [1, 1]],
   ];
-  const nClusters = n(theme === 'lager' ? 22 : theme === 'wueste' ? 14 : 11);
+  const nClusters = n(P.clusters);
   for (let i = 0, a = 0; i < nClusters && a < 500; a++) {
     const pat = rng.pick(patterns);
     const ox = rng.range(T + 80, W - T - 200);
@@ -329,7 +337,7 @@ function generate(m: GameMap, rng: Rng): void {
     if (box.x + box.w > W - T - 80 || box.y + box.h > H - T - 80) continue;
     if (blockers.some((o) => rectsOverlap(box, o, 70))) continue;
     for (const r of rects) {
-      const steel = theme === 'lager' ? rng.chance(0.2) : theme === 'wueste' ? rng.chance(0.1) : false;
+      const steel = P.steel > 0 && rng.chance(P.steel);
       const hp = steel ? Infinity : 110;
       m.addSolid({ kind: steel ? 'steel' : 'crate', ...r, hp, maxHp: hp, round: false, cx: r.x + r.w / 2, cy: r.y + r.h / 2, r: 0 });
     }
@@ -338,7 +346,7 @@ function generate(m: GameMap, rng: Rng): void {
   }
 
   // Explosive barrels
-  const nBarrels = n(theme === 'wueste' ? 9 : theme === 'lager' ? 7 : 4);
+  const nBarrels = n(P.barrels);
   for (let i = 0, a = 0; i < nBarrels && a < 300; a++) {
     const s = 38;
     const box = { x: rng.range(T + 80, W - T - 120), y: rng.range(T + 80, H - T - 120), w: s, h: s };
@@ -349,7 +357,7 @@ function generate(m: GameMap, rng: Rng): void {
   }
 
   // Bushes (hiding spots, not solid)
-  const nBush = n(theme === 'wald' ? 24 : theme === 'wueste' ? 10 : 9);
+  const nBush = n(P.bush);
   for (let i = 0, a = 0; i < nBush && a < 400; a++) {
     const r = rng.range(50, 78);
     const x = rng.range(T + r, W - T - r);

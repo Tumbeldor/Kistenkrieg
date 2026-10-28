@@ -3,7 +3,7 @@
 // and apply the host's snapshots/events.
 import {
   BASE_HP, BASE_SPEED, DIFFS, MAX_TOTAL, MatchSettings, MapId, PERKS, PICKUP_WEAPONS, PLAYER_RADIUS, PerkId,
-  RESPAWN_TIME, SPAWN_PROTECT, WEAPONS, WEAPON_LIST, WeaponId, BOT_NAMES,
+  RESPAWN_TIME, SPAWN_PROTECT, WEAPONS, WEAPON_LIST, WeaponId, BOT_NAMES, GUN_TIERS, GRENADES, isFfa,
 } from './config';
 import { GameMap, MapSize, PickupKind, Solid } from './map';
 import { Vec, angleDiff, dist, dist2, lerp, lerpAngle, segCircle } from './geom';
@@ -19,8 +19,10 @@ export interface PlayerInput {
   reload: boolean;
   next: boolean;
   slot: number; // -1 = no change
+  throw: boolean; // hand grenade
+  throwDist: number; // desired throw distance (0 = default)
 }
-export const emptyInput = (): PlayerInput => ({ mx: 0, my: 0, aim: 0, fire: false, reload: false, next: false, slot: -1 });
+export const emptyInput = (): PlayerInput => ({ mx: 0, my: 0, aim: 0, fire: false, reload: false, next: false, slot: -1, throw: false, throwDist: 0 });
 
 export interface PlayerInfo {
   id: string;
@@ -65,6 +67,9 @@ export interface Player extends PlayerInfo {
   dmgMul: number;
   brain: Bot | null;
   removeT: number;
+  grenades: number;
+  nextThrow: number;
+  tier: number; // Waffenmeister: index into GUN_TIERS
   // client-side interpolation buffer
   buf: { t: number; x: number; y: number; a: number }[];
 }
@@ -94,7 +99,7 @@ export interface ResultRow { id: string; name: string; bot: boolean; team: numbe
 export interface MatchResult { mode: MatchSettings['mode']; winnerTeam: number | null; winnerId: string | null; rows: ResultRow[]; wave: number; duration: number }
 
 export type GameEvent =
-  | { e: 'shot'; p: string; w: WeaponId; x: number; y: number; a: number[]; b: string }
+  | { e: 'shot'; p: string; w: WeaponId; x: number; y: number; a: number[]; b: string; pw?: number }
   | { e: 'beam'; p: string; x: number; y: number; x2: number; y2: number }
   | { e: 'hit'; t: string; by: string; d: number; x: number; y: number; b?: string }
   | { e: 'kill'; k: string | null; v: string; w: WeaponId | 'boom' }
@@ -108,6 +113,7 @@ export type GameEvent =
   | { e: 'join'; pl: PlayerInfo }
   | { e: 'leave'; p: string }
   | { e: 'wave'; n: number; boss: boolean }
+  | { e: 'arm'; p: string; tier: number }
   | { e: 'msg'; text: string }
   | { e: 'end'; res: MatchResult }
   // local-only effects (never sent)
@@ -115,7 +121,7 @@ export type GameEvent =
   | { e: 'empty'; p: string }
   | { e: 'reload'; p: string };
 
-export interface ShotMsg { w: WeaponId; x: number; y: number; a: number[]; b: string }
+export interface ShotMsg { w: WeaponId; x: number; y: number; a: number[]; b: string; pw?: number }
 
 export interface GameOptions {
   authority: boolean;
@@ -128,6 +134,21 @@ export interface GameOptions {
 
 const PICKUP_RESPAWN: Record<PickupKind, number> = { health: 18, armor: 25, weapon: 22 };
 const BOSS_NAMES = ['Juggernaut', 'Koloss', 'Bollwerk', 'Titan', 'Rammbock'];
+
+/** Distance a full-power hand grenade travels before it explodes (speed · (1 − 0.3^fuse) / ln(1/0.3)). */
+const GRENADE_REACH = (WEAPONS.grenade.speed * (1 - Math.pow(0.3, WEAPONS.grenade.fuse))) / Math.log(1 / 0.3);
+const grenadeCount = (perk: PerkId) => GRENADES + (perk === 'grenadier' ? 2 : 0);
+
+/** Outward surface normal of a solid at a point on its edge. */
+function normalAt(s: Solid, x: number, y: number): Vec {
+  if (s.round) {
+    const l = Math.hypot(x - s.cx, y - s.cy) || 1;
+    return { x: (x - s.cx) / l, y: (y - s.cy) / l };
+  }
+  const d = [Math.abs(x - s.x), Math.abs(x - (s.x + s.w)), Math.abs(y - s.y), Math.abs(y - (s.y + s.h))];
+  const m = Math.min(...d);
+  return m === d[0] ? { x: -1, y: 0 } : m === d[1] ? { x: 1, y: 0 } : m === d[2] ? { x: 0, y: -1 } : { x: 0, y: 1 };
+}
 
 export const sameTeam = (a: { team: number }, b: { team: number }) => a.team >= 0 && a.team === b.team;
 
@@ -170,7 +191,8 @@ export class Game {
     this.map = new GameMap(o.seed, o.mapId, o.size);
     this.timeLeft = o.settings.mode === 'survival' ? 0 : o.settings.timeLimit;
     this.pickups = this.map.pickupSpots.map((s, i) => ({
-      i, x: s.x, y: s.y, kind: s.kind, w: s.kind === 'weapon' ? pick(PICKUP_WEAPONS) : null, on: true, t: 0,
+      i, x: s.x, y: s.y, kind: s.kind, w: s.kind === 'weapon' ? pick(PICKUP_WEAPONS) : null,
+      on: !(s.kind === 'weapon' && o.settings.mode === 'gungame'), t: 0, // Waffenmeister: no weapon pickups
     }));
   }
 
@@ -194,7 +216,9 @@ export class Game {
       slots: loadout(info.primary, info.perk), cur: 0, wid: info.primary, reloading: false,
       kills: 0, deaths: 0, score: 0, streak: 0, lastShotAt: -9, lastHurtAt: -9, lastAttacker: null, killedBy: null,
       spawnSeq: 0, dmgMul: 1, brain: null, removeT: 0, buf: [],
+      grenades: grenadeCount(info.perk), nextThrow: 0, tier: 0,
     };
+    if (this.settings.mode === 'gungame') { p.slots = this.armSlots(p); p.wid = p.slots[0].id; }
     if (info.bot) {
       const diff = DIFFS[this.settings.diff];
       p.dmgMul = diff.dmgMul * (info.boss ? 1.2 : 1);
@@ -241,8 +265,10 @@ export class Game {
     this.usedNames.add(name);
     if (opts.boss) name = pick(BOSS_NAMES);
     const diff = this.settings.diff;
-    const pool: WeaponId[] = diff === 'easy' ? ['pistol', 'smg', 'smg', 'shotgun'] : diff === 'normal' ? ['smg', 'rifle', 'shotgun', 'pistol', 'smg']
-      : diff === 'hard' ? ['smg', 'rifle', 'shotgun', 'rifle', 'sniper', 'minigun'] : ['rifle', 'shotgun', 'sniper', 'minigun', 'rocket', 'rail', 'smg'];
+    const pool: WeaponId[] = diff === 'easy' ? ['pistol', 'smg', 'smg', 'shotgun', 'revolver']
+      : diff === 'normal' ? ['smg', 'rifle', 'shotgun', 'pistol', 'smg', 'revolver', 'crossbow', 'smgsil']
+      : diff === 'hard' ? ['smg', 'rifle', 'shotgun', 'rifle', 'sniper', 'minigun', 'dmr', 'lmg', 'autoshotgun', 'crossbow']
+      : ['rifle', 'shotgun', 'sniper', 'minigun', 'rocket', 'rail', 'smg', 'dmr', 'lmg', 'autoshotgun', 'gl'];
     const skins = ['woodland', 'desert', 'urban', 'olive', 'navy', 'black', 'digital', 'tiger', 'arid'];
     const hats = ['none', 'cap', 'beanie', 'headset', 'helmet', 'helmet', 'boonie', 'beret', 'balaclava'];
     const info: PlayerInfo = {
@@ -277,6 +303,20 @@ export class Game {
     return { ...pick(top).s };
   }
 
+  /** Weapons a player spawns with: loadout, or the current tier in Waffenmeister. */
+  armSlots(p: Player): WeaponSlot[] {
+    if (this.settings.mode !== 'gungame') return loadout(p.primary, p.perk);
+    return [makeSlot(GUN_TIERS[Math.min(p.tier, GUN_TIERS.length - 1)], p.perk)];
+  }
+
+  /** Waffenmeister: hand the player the weapon of their current tier. */
+  private arm(p: Player) {
+    p.slots = this.armSlots(p);
+    p.cur = 0;
+    p.wid = p.slots[0].id;
+    this.emit({ e: 'arm', p: p.id, tier: p.tier });
+  }
+
   spawnPlayer(p: Player) {
     const s = this.chooseSpawn(p);
     p.x = s.x;
@@ -286,9 +326,10 @@ export class Game {
     p.hp = p.maxHp;
     p.armor = 0;
     p.protectT = SPAWN_PROTECT;
-    p.slots = loadout(p.primary, p.perk);
+    p.slots = this.armSlots(p);
     p.cur = 0;
     p.wid = p.slots[0].id;
+    p.grenades = grenadeCount(p.perk);
     p.spawnSeq++;
     p.killedBy = null;
     p.buf.length = 0;
@@ -363,6 +404,13 @@ export class Game {
     }
     if (res.reloadStarted) this.emit({ e: 'reload', p: p.id }, false);
     for (let i = 0; i < res.shots; i++) this.fire(p, def.id);
+    if (inp.throw && p.grenades > 0 && this.time >= p.nextThrow) {
+      p.grenades--;
+      p.nextThrow = this.time + 0.8;
+      // throw so that the grenade comes to rest near the requested distance when the fuse runs out
+      const want = inp.throwDist > 0 ? inp.throwDist : 400;
+      this.fire(p, 'grenade', Math.max(0.25, Math.min(1, want / GRENADE_REACH)));
+    }
     if (slot.pickup && slot.ammo <= 0 && slot.reserve <= 0 && p.slots.length > 1) {
       p.slots.splice(p.cur, 1);
       p.cur = 0;
@@ -406,7 +454,7 @@ export class Game {
     return { x: mx, y: my };
   }
 
-  private fire(p: Player, w: WeaponId) {
+  private fire(p: Player, w: WeaponId, power = 1) {
     const def = WEAPONS[w];
     const mz = this.muzzle(p, w);
     const angles: number[] = [];
@@ -416,7 +464,7 @@ export class Game {
       const jitter = def.pellets > 1 ? (Math.random() - 0.5) * spread * 0.25 : 0;
       angles.push(Math.round((p.aim + base + jitter) * 1000) / 1000);
     }
-    p.lastShotAt = this.time;
+    if (!def.silent) p.lastShotAt = this.time;
     if (this.authority) this.alertBots(p, mz.x, mz.y, w);
     const b = p.id + '.' + ++this.seq;
     const x = Math.round(mz.x), y = Math.round(mz.y);
@@ -424,10 +472,11 @@ export class Game {
       const end = this.beam(p, x, y, angles[0], !this.authority);
       this.emit({ e: 'beam', p: p.id, x, y, x2: Math.round(end.x), y2: Math.round(end.y) });
     } else {
-      this.spawnBullets(p, w, x, y, angles, b, !this.authority);
-      this.emit({ e: 'shot', p: p.id, w, x, y, a: angles, b });
+      const pw = power < 1 ? Math.round(power * 100) / 100 : undefined;
+      this.spawnBullets(p, w, x, y, angles, b, !this.authority, pw);
+      this.emit({ e: 'shot', p: p.id, w, x, y, a: angles, b, pw });
     }
-    if (!this.authority) this.outShots.push({ w, x, y, a: angles, b });
+    if (!this.authority) this.outShots.push({ w, x, y, a: angles, b, pw: power < 1 ? Math.round(power * 100) / 100 : undefined });
   }
 
   /** Host: a client reported a shot. */
@@ -435,32 +484,34 @@ export class Game {
     const p = this.players.get(pid);
     if (!p || !p.alive || !WEAPONS[s.w] || !Array.isArray(s.a)) return;
     const def = WEAPONS[s.w];
-    p.lastShotAt = this.time;
+    if (!def.silent) p.lastShotAt = this.time;
     this.alertBots(p, s.x, s.y, s.w);
     const angles = s.a.slice(0, def.pellets);
     if (def.kind === 'beam') {
       const end = this.beam(p, s.x, s.y, angles[0], false);
       this.emit({ e: 'beam', p: pid, x: s.x, y: s.y, x2: Math.round(end.x), y2: Math.round(end.y) });
     } else {
-      this.spawnBullets(p, s.w, s.x, s.y, angles, String(s.b), false);
-      this.emit({ e: 'shot', p: pid, w: s.w, x: s.x, y: s.y, a: angles, b: String(s.b) });
+      const pw = typeof s.pw === 'number' ? Math.max(0.2, Math.min(1, s.pw)) : undefined;
+      this.spawnBullets(p, s.w, s.x, s.y, angles, String(s.b), false, pw);
+      this.emit({ e: 'shot', p: pid, w: s.w, x: s.x, y: s.y, a: angles, b: String(s.b), pw });
     }
   }
 
   /** Gunfire is audible: nearby enemy bots investigate the area. */
   private alertBots(shooter: Player, x: number, y: number, w: WeaponId) {
     const def = WEAPONS[w];
-    const range = def.kind === 'flame' ? 450 : w === 'sniper' || w === 'rocket' || w === 'rail' ? 1400 : 1000;
+    if (def.silent) return;
+    const range = w === 'grenade' ? 500 : def.kind === 'flame' ? 450 : w === 'sniper' || w === 'rocket' || w === 'rail' ? 1400 : 1000;
     for (const b of this.list) {
       if (!b.brain || !b.alive || b === shooter || sameTeam(b, shooter)) continue;
       if (dist2(b.x, b.y, x, y) < range * range) b.brain.onNoise(x, y);
     }
   }
 
-  spawnBullets(p: { id: string; team: number }, w: WeaponId, x: number, y: number, angles: number[], b: string, visual: boolean) {
+  spawnBullets(p: { id: string; team: number }, w: WeaponId, x: number, y: number, angles: number[], b: string, visual: boolean, power = 1) {
     const def = WEAPONS[w];
     angles.forEach((a, i) => {
-      const sp = def.speed * (def.pellets > 1 ? rand(0.85, 1.1) : def.kind === 'flame' ? rand(0.8, 1.15) : 1);
+      const sp = def.speed * power * (def.pellets > 1 ? rand(0.85, 1.1) : def.kind === 'flame' ? rand(0.8, 1.15) : 1);
       this.bullets.push({
         id: def.pellets > 1 ? b + ':' + i : b, owner: p.id, team: p.team, w, x, y,
         vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, travelled: 0, range: def.range * (def.kind === 'flame' ? rand(0.75, 1.1) : 1),
@@ -503,6 +554,18 @@ export class Game {
         const drag = Math.pow(0.12, dt);
         b.vx *= drag;
         b.vy *= drag;
+      } else if (def.kind === 'grenade') {
+        const drag = Math.pow(0.3, dt);
+        b.vx *= drag;
+        b.vy *= drag;
+        if (b.age >= def.fuse) {
+          b.dead = true;
+          if (!b.visual) {
+            this.explode(b.x, b.y, def.splash, def.splashDmg, b.owner, b.w);
+            this.emit({ e: 'bend', b: b.id });
+          }
+          continue;
+        }
       }
       const dx = b.vx * dt;
       const dy = b.vy * dt;
@@ -528,15 +591,15 @@ export class Game {
         }
         if (!b.visual) {
           const owner = this.players.get(b.owner);
-          if (def.kind === 'rocket') {
-            this.damagePlayer(h.p, b.dmg, owner ?? null, b.w, hx, hy, b.id);
+          if (def.kind === 'rocket' || def.kind === 'grenade') {
+            if (b.dmg > 0) this.damagePlayer(h.p, b.dmg, owner ?? null, b.w, hx, hy, b.id);
             this.explode(hx, hy, def.splash, def.splashDmg, b.owner, b.w);
             this.emit({ e: 'bend', b: b.id });
           } else {
             this.damagePlayer(h.p, b.dmg, owner ?? null, b.w, hx, hy, b.id);
           }
         }
-        if (b.pierce-- <= 0 || def.kind === 'rocket') {
+        if (b.pierce-- <= 0 || def.kind === 'rocket' || def.kind === 'grenade') {
           b.dead = true;
           b.x = hx;
           b.y = hy;
@@ -544,6 +607,17 @@ export class Game {
         }
       }
       if (b.dead) continue;
+      if (rh.solid && def.kind === 'grenade') {
+        // bounce off walls and crates
+        const hx = b.x + dx * rh.t, hy = b.y + dy * rh.t;
+        const n = normalAt(rh.solid, hx, hy);
+        const dot = b.vx * n.x + b.vy * n.y;
+        b.vx = (b.vx - 2 * dot * n.x) * 0.55;
+        b.vy = (b.vy - 2 * dot * n.y) * 0.55;
+        b.x = hx + n.x * 2;
+        b.y = hy + n.y * 2;
+        continue;
+      }
       if (rh.solid) {
         const hx = b.x + dx * rh.t, hy = b.y + dy * rh.t;
         b.dead = true;
@@ -610,6 +684,17 @@ export class Game {
       if (k.streak === 3 || k.streak === 5 || k.streak === 8) {
         this.emit({ e: 'msg', text: `${k.name}: ${k.streak} Eliminierungen in Folge` });
       }
+      if (this.settings.mode === 'gungame' && w === GUN_TIERS[Math.min(k.tier, GUN_TIERS.length - 1)]) {
+        k.tier++;
+        k.score = k.tier * 100;
+        if (k.tier >= GUN_TIERS.length) {
+          this.emit({ e: 'kill', k: k.id, v: v.id, w });
+          this.finish();
+          return;
+        }
+        if (k.tier === GUN_TIERS.length - 1) this.emit({ e: 'msg', text: `${k.name} hat die letzte Waffe!` });
+        this.arm(k);
+      }
     } else {
       v.score = Math.max(0, v.score - 50);
     }
@@ -656,6 +741,7 @@ export class Game {
 
   private updatePickups(dt: number) {
     for (const pk of this.pickups) {
+      if (pk.kind === 'weapon' && this.settings.mode === 'gungame') continue;
       if (!pk.on) {
         pk.t -= dt;
         if (pk.t <= 0) {
@@ -674,7 +760,7 @@ export class Game {
         pk.t = PICKUP_RESPAWN[pk.kind];
         this.emit({ e: 'pk', i: pk.i, on: 0 });
         if (pk.kind === 'health') p.hp = Math.min(p.maxHp, p.hp + 50);
-        else if (pk.kind === 'armor') p.armor = Math.min(100, p.armor + 50);
+        else if (pk.kind === 'armor') { p.armor = Math.min(100, p.armor + 50); p.grenades = Math.min(p.grenades + 1, 6); }
         else if (pk.w) {
           const remote = !p.bot && p.id !== this.localId;
           if (remote) this.emit({ e: 'give', p: p.id, w: pk.w });
@@ -777,8 +863,9 @@ export class Game {
 
   private spawnWaveBot() {
     const w = this.wave;
-    const pool: WeaponId[] = w <= 2 ? ['pistol', 'smg'] : w <= 4 ? ['smg', 'shotgun', 'pistol', 'rifle'] : w <= 7 ? ['smg', 'shotgun', 'rifle', 'sniper', 'flamer']
-      : ['rifle', 'shotgun', 'sniper', 'minigun', 'flamer', 'rocket', 'rail'];
+    const pool: WeaponId[] = w <= 2 ? ['pistol', 'smg', 'revolver'] : w <= 4 ? ['smg', 'shotgun', 'pistol', 'rifle', 'crossbow', 'smgsil']
+      : w <= 7 ? ['smg', 'shotgun', 'rifle', 'sniper', 'flamer', 'dmr', 'lmg', 'autoshotgun']
+      : ['rifle', 'shotgun', 'sniper', 'minigun', 'flamer', 'rocket', 'rail', 'lmg', 'autoshotgun', 'gl'];
     this.waveToSpawn--;
     this.addBot(1, { hpMul: 1 + 0.07 * (w - 1), weapon: pick(pool) });
   }
@@ -801,11 +888,12 @@ export class Game {
     const rows: ResultRow[] = this.list
       .filter((p) => !(s.mode === 'survival' && p.bot && p.team === 1))
       .map((p) => ({ id: p.id, name: p.name, bot: p.bot, team: p.team, kills: p.kills, deaths: p.deaths, score: p.score, place: 0 }));
-    rows.sort((a, b) => b.kills - a.kills || a.deaths - b.deaths || b.score - a.score);
+    if (s.mode === 'gungame') rows.sort((a, b) => b.score - a.score || b.kills - a.kills || a.deaths - b.deaths);
+    else rows.sort((a, b) => b.kills - a.kills || a.deaths - b.deaths || b.score - a.score);
     rows.forEach((r, i) => (r.place = i + 1));
     let winnerTeam: number | null = null;
     let winnerId: string | null = null;
-    if (s.mode === 'dm') winnerId = rows[0]?.id ?? null;
+    if (isFfa(s.mode)) winnerId = rows[0]?.id ?? null;
     else if (s.mode === 'team') winnerTeam = this.teamKills[0] === this.teamKills[1] ? null : this.teamKills[0] > this.teamKills[1] ? 0 : 1;
     const cleared = s.mode === 'survival' ? Math.max(0, this.wave - 1) : 0;
     this.result = { mode: s.mode, winnerTeam, winnerId, rows, wave: cleared, duration: Math.round(this.time) };
@@ -816,7 +904,7 @@ export class Game {
 
   populateBots() {
     const s = this.settings;
-    if (s.mode === 'dm') for (let i = 0; i < s.bots; i++) this.addBot(-1);
+    if (isFfa(s.mode)) for (let i = 0; i < s.bots; i++) this.addBot(-1);
     else if (s.mode === 'team') {
       for (let i = 0; i < s.allies; i++) this.addBot(0);
       for (let i = 0; i < s.bots; i++) this.addBot(1);
@@ -935,8 +1023,8 @@ export class Game {
       case 'shot': {
         if (ev.p === local) return false;
         const p = this.players.get(ev.p);
-        if (p) p.lastShotAt = this.time;
-        this.spawnBullets({ id: ev.p, team: p?.team ?? -1 }, ev.w, ev.x, ev.y, ev.a, ev.b, true);
+        if (p && !WEAPONS[ev.w].silent) p.lastShotAt = this.time;
+        this.spawnBullets({ id: ev.p, team: p?.team ?? -1 }, ev.w, ev.x, ev.y, ev.a, ev.b, true, ev.pw ?? 1);
         return true;
       }
       case 'beam': {
@@ -986,13 +1074,25 @@ export class Game {
         p.buf.length = 0;
         p.killedBy = null;
         if (ev.p === local) {
-          p.slots = loadout(p.primary, p.perk);
+          p.slots = this.armSlots(p);
           p.cur = 0;
           p.wid = p.slots[0].id;
           p.hp = p.maxHp;
           p.armor = 0;
+          p.grenades = grenadeCount(p.perk);
         }
         return true;
+      }
+      case 'arm': {
+        const p = this.players.get(ev.p);
+        if (!p) return false;
+        p.tier = ev.tier;
+        if (ev.p === local) {
+          p.slots = this.armSlots(p);
+          p.cur = 0;
+          p.wid = p.slots[0].id;
+        }
+        return ev.p === local;
       }
       case 'join':
         if (this.players.has(ev.pl.id)) return false;

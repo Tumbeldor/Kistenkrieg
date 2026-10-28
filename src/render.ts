@@ -1,11 +1,12 @@
 // Canvas renderer: world, entities, effects and HUD.
-import { MapId, TEAM_COLORS, TEAM_NAMES, WEAPONS, WeaponId, skinDef } from './config';
+import { GUN_TIERS, MapId, TEAM_COLORS, TEAM_NAMES, WEAPONS, WeaponId, skinDef } from './config';
 import type { Fx } from './fx';
 import type { Game, Player } from './game';
 import { sameTeam } from './game';
 import type { Input } from './input';
 import { GameMap, Solid } from './map';
 import { dist } from './geom';
+import { drawWeaponSide } from './weaponart';
 
 interface Theme {
   bg: string; floor: string; floor2: string; line: string; wall: string; wallTop: string; wallEdge: string;
@@ -18,6 +19,10 @@ const THEMES: Record<MapId, Theme> = {
     bush: '#34502c', bush2: '#3f5e35', bushEdge: '#233620', rock: '#2d4527', rock2: '#3a5832', shadow: 'rgba(0,10,0,0.35)' },
   wueste: { bg: '#221c14', floor: '#b9a27c', floor2: '#b39b74', line: '#a68f6a', wall: '#86705a', wallTop: '#b39d80', wallEdge: '#5d4c3b',
     bush: '#717449', bush2: '#83865a', bushEdge: '#4f5133', rock: '#857561', rock2: '#9c8c77', shadow: 'rgba(40,25,5,0.3)' },
+  winter: { bg: '#141a20', floor: '#d6dde3', floor2: '#cfd7de', line: '#c3ccd4', wall: '#5d646b', wallTop: '#9aa3ab', wallEdge: '#3a4046',
+    bush: '#4f6152', bush2: '#dfe6ea', bushEdge: '#33423a', rock: '#2f4436', rock2: '#e6ecef', shadow: 'rgba(40,60,80,0.25)' },
+  stadt: { bg: '#101113', floor: '#3c3e42', floor2: '#383a3e', line: '#c9b25a', wall: '#4a4643', wallTop: '#77716b', wallEdge: '#2a2826',
+    bush: '#3d5233', bush2: '#4a6340', bushEdge: '#29381f', rock: '#555', rock2: '#777', shadow: 'rgba(0,0,0,0.38)' },
 };
 
 export function shade(hex: string, amt: number): string {
@@ -161,6 +166,36 @@ export class Renderer {
         x.fillStyle = Math.random() < 0.5 ? 'rgba(60,45,30,0.25)' : 'rgba(30,30,25,0.2)';
         x.fillRect(Math.random() * S, Math.random() * S, 2, 2);
       }
+    } else if (theme === 'winter') {
+      // snow: soft drifts, footprints, a few twigs
+      for (let i = 0; i < 8; i++) {
+        x.fillStyle = Math.random() < 0.5 ? 'rgba(150,170,190,0.06)' : 'rgba(255,255,255,0.16)';
+        x.beginPath(); x.ellipse(Math.random() * S, Math.random() * S, 30 + Math.random() * 40, 12 + Math.random() * 16, Math.random() * 3, 0, 7); x.fill();
+      }
+      x.fillStyle = 'rgba(120,140,160,0.1)';
+      for (let i = 0; i < 6; i++) {
+        const px = 40 + i * 20, py = 140 + Math.sin(i) * 20 + (i % 2) * 10;
+        x.beginPath(); x.ellipse(px, py, 4, 6, 0.4, 0, 7); x.fill();
+      }
+      x.strokeStyle = 'rgba(80,70,60,0.35)';
+      x.lineWidth = 1.5;
+      for (let i = 0; i < 5; i++) {
+        const px = Math.random() * S, py = Math.random() * S;
+        x.beginPath(); x.moveTo(px, py); x.lineTo(px + 8, py - 4); x.lineTo(px + 12, py - 1); x.stroke();
+      }
+    } else if (theme === 'stadt') {
+      // asphalt with cracks, a manhole and a faded road marking
+      for (let i = 0; i < 500; i++) {
+        x.fillStyle = Math.random() < 0.5 ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.05)';
+        x.fillRect(Math.random() * S, Math.random() * S, 2, 2);
+      }
+      x.fillStyle = 'rgba(201,178,90,0.16)';
+      for (let px = 8; px < S; px += 64) x.fillRect(px, 126, 36, 4);
+      x.strokeStyle = 'rgba(0,0,0,0.35)';
+      x.lineWidth = 1.2;
+      x.beginPath(); x.moveTo(30, 20); x.lineTo(46, 38); x.lineTo(44, 60); x.lineTo(60, 74); x.stroke();
+      x.fillStyle = 'rgba(0,0,0,0.1)';
+      x.beginPath(); x.ellipse(190, 200, 34, 18, 0.3, 0, 7); x.fill();
     } else {
       x.strokeStyle = t.line;
       x.lineWidth = 2;
@@ -292,6 +327,27 @@ export class Renderer {
         ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, 7); ctx.fill();
         ctx.globalAlpha = 1;
         ctx.globalCompositeOperation = 'source-over';
+      } else if (def.kind === 'grenade') {
+        const big = b.w === 'gl';
+        const blink = Math.sin(b.age * (8 + b.age * 14)) > 0.4;
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.beginPath(); ctx.arc(b.x + 2, b.y + 3, big ? 5 : 6, 0, 7); ctx.fill();
+        ctx.fillStyle = big ? '#6d7452' : '#4f5a3a';
+        ctx.beginPath(); ctx.arc(b.x, b.y, big ? 5 : 6, 0, 7); ctx.fill();
+        ctx.strokeStyle = '#1d2016'; ctx.lineWidth = 1.2; ctx.stroke();
+        if (blink) { ctx.fillStyle = '#e05a4a'; ctx.beginPath(); ctx.arc(b.x, b.y, 1.8, 0, 7); ctx.fill(); }
+      } else if (b.w === 'crossbow') {
+        const a = Math.atan2(b.vy, b.vx);
+        ctx.save();
+        ctx.translate(b.x, b.y);
+        ctx.rotate(a);
+        ctx.fillStyle = '#5a4a36';
+        ctx.fillRect(-22, -1.2, 22, 2.4);
+        ctx.fillStyle = '#c9ccd0';
+        ctx.beginPath(); ctx.moveTo(0, -2.2); ctx.lineTo(6, 0); ctx.lineTo(0, 2.2); ctx.fill();
+        ctx.fillStyle = '#8a8f96';
+        ctx.fillRect(-24, -3, 5, 1.5); ctx.fillRect(-24, 1.5, 5, 1.5);
+        ctx.restore();
       } else if (def.kind === 'rocket') {
         const a = Math.atan2(b.vy, b.vx);
         ctx.save();
@@ -445,10 +501,7 @@ export class Renderer {
 
   gunIcon(c: HTMLCanvasElement, w: WeaponId) {
     this.withCanvas(c, (x) => {
-      const s = c.height / 22;
-      const L = (WEAPONS[w].len + 10) * 1.0;
-      x.setTransform(s, 0, 0, s, c.width / 2 - (L * s) / 2, c.height / 2);
-      this.drawGun(w, 0, 1, true);
+      drawWeaponSide(x, w, c.width / 2, c.height / 2, Math.min(c.width * 0.92, (c.height / 40) * 100 * 0.95));
     });
   }
 
@@ -464,14 +517,14 @@ export class Renderer {
       ctx.fillRect(s.x + 3, s.y + 3, s.w - 6, s.h - 6);
       ctx.fillStyle = th.wallTop;
       ctx.fillRect(s.x + 3, s.y + 3, s.w - 6, Math.min(5, s.h - 6));
-      if (this.map?.theme === 'lager' && s.w > 40 && s.h > 20 && s.h < 40) {
+      if ((this.map?.theme === 'lager' || this.map?.theme === 'stadt') && s.w > 40 && s.h > 20 && s.h < 40) {
         ctx.fillStyle = 'rgba(200,170,60,0.18)';
         for (let x = s.x + 10; x < s.x + s.w - 20; x += 40) ctx.fillRect(x, s.y + s.h / 2 - 2, 18, 4);
       }
       return;
     }
     if (s.kind === 'rock') {
-      if (this.map?.theme === 'wald') {
+      if (this.map?.theme === 'wald' || this.map?.theme === 'winter') {
         ctx.fillStyle = shade(th.rock, -0.25);
         ctx.beginPath(); ctx.arc(s.cx, s.cy, s.r, 0, 7); ctx.fill();
         ctx.fillStyle = th.rock;
@@ -640,25 +693,9 @@ export class Renderer {
       ctx.fillRect(x - 7, y + 1, 4, 7); ctx.fillRect(x - 2, y + 1, 4, 7); ctx.fillRect(x + 3, y + 1, 4, 7);
       ctx.fillRect(x - 9.5, y - 6, 19, 2);
     } else if (w) {
-      ctx.save();
-      ctx.translate(x - 15, y);
-      this.drawGun(w, 0, 0.9, true);
-      ctx.restore();
+      drawWeaponSide(ctx, w, x, y, 46);
     }
     ctx.globalAlpha = 1;
-  }
-
-  /** Gun in local coords (x forward). outline=true adds a light rim for icons on dark backgrounds. */
-  private drawGun(w: WeaponId, x0: number, scale = 1, outline = false) {
-    if (outline) {
-      const ctx = this.ctx;
-      for (const [dx, dy] of [[-1.3, 0], [1.3, 0], [0, -1.3], [0, 1.3]]) {
-        ctx.translate(dx, dy);
-        this.gunShape(w, x0, scale, 'rgba(225,232,242,0.6)');
-        ctx.translate(-dx, -dy);
-      }
-    }
-    this.gunShape(w, x0, scale);
   }
 
   private gunShape(w: WeaponId, x0: number, scale: number, mono?: string) {
@@ -719,6 +756,49 @@ export class Renderer {
         rect(x0 - 2 * scale, -T * 0.45, L * 0.35, T * 0.9, '#22262b', 2);
         rect(x0 + L * 0.3, -T * 0.4, L * 0.7, T * 0.8, metal, 1);
         rect(x0 + L * 0.35, -1, L * 0.6, 2, '#5fb7c9');
+        break;
+      case 'revolver':
+        rect(x0, -T * 0.42, L * 0.4, T * 0.84, '#3a3027', 2);
+        rect(x0 + L * 0.3, -T * 0.5, L * 0.25, T, metal, 2);
+        rect(x0 + L * 0.5, -T * 0.22, L * 0.5, T * 0.44, metal2);
+        break;
+      case 'smgsil':
+        rect(x0 - 2 * scale, -T * 0.2, L * 0.2, T * 0.4, metal2);
+        rect(x0 + L * 0.12, -T * 0.45, L * 0.45, T * 0.9, poly, 1.5);
+        rect(x0 + L * 0.55, -T * 0.32, L * 0.45, T * 0.64, '#141618', 2);
+        break;
+      case 'dmr':
+        rect(x0 - 4 * scale, -T * 0.42, L * 0.28, T * 0.84, '#3a3d34', 2);
+        rect(x0 + L * 0.2, -T * 0.4, L * 0.35, T * 0.8, metal);
+        rect(x0 + L * 0.24, -T * 0.6, L * 0.24, T * 1.2, '#121416', 2);
+        rect(x0 + L * 0.55, -T * 0.22, L * 0.45, T * 0.44, metal);
+        break;
+      case 'lmg':
+        rect(x0 - 3 * scale, -T * 0.4, L * 0.26, T * 0.8, poly, 2);
+        rect(x0 + L * 0.2, -T * 0.5, L * 0.42, T, metal, 1);
+        rect(x0 + L * 0.3, T * 0.3, L * 0.18, T * 0.55, '#3a3d34', 1);
+        rect(x0 + L * 0.6, -T * 0.22, L * 0.4, T * 0.44, metal2);
+        break;
+      case 'autoshotgun':
+        rect(x0 - 2 * scale, -T * 0.4, L * 0.24, T * 0.8, poly, 2);
+        rect(x0 + L * 0.2, -T * 0.5, L * 0.5, T, metal, 2);
+        rect(x0 + L * 0.66, -T * 0.3, L * 0.34, T * 0.6, metal2);
+        break;
+      case 'gl':
+        rect(x0 - 2 * scale, -T * 0.32, L * 0.25, T * 0.64, poly, 2);
+        rect(x0 + L * 0.2, -T * 0.5, L * 0.32, T, '#3f4434', 4);
+        rect(x0 + L * 0.48, -T * 0.34, L * 0.52, T * 0.68, metal, 2);
+        break;
+      case 'crossbow':
+        rect(x0, -T * 0.25, L, T * 0.5, '#4a3c2c', 1.5);
+        rect(x0 + L * 0.62, -T * 1.4, 3 * scale, T * 2.8, '#1f2124', 1.5);
+        ctx.strokeStyle = c('rgba(220,215,200,0.7)');
+        ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        ctx.moveTo(x0 + L * 0.66, -T * 1.35); ctx.lineTo(x0 + L * 0.35, 0); ctx.lineTo(x0 + L * 0.66, T * 1.35);
+        ctx.stroke();
+        break;
+      case 'grenade':
         break;
     }
   }
@@ -1290,6 +1370,18 @@ export class Renderer {
       ctx.font = `600 ${small ? 9 : 11}px 'Barlow', system-ui, sans-serif`;
       ctx.fillStyle = 'rgba(255,255,255,0.6)';
       ctx.fillText(`Ziel ${s.killLimit}`, W / 2, y + h * 0.82);
+    } else if (s.mode === 'gungame') {
+      const w = small ? 250 : 320, h = small ? 40 : 50;
+      this.panel(W / 2 - w / 2, y, w, h);
+      const n = GUN_TIERS.length;
+      const tier = Math.min(n - 1, Math.floor((me?.score ?? 0) / 100));
+      const leader = [...g.list].sort((a, b) => b.score - a.score)[0];
+      ctx.font = `700 ${small ? 12 : 14}px 'Barlow', system-ui, sans-serif`;
+      ctx.fillStyle = '#fff';
+      ctx.fillText(`${fmtTime(g.timeLeft)}  ·  Stufe ${tier + 1}/${n}: ${WEAPONS[GUN_TIERS[tier]].name}`, W / 2, y + h * 0.42);
+      ctx.font = `600 ${small ? 11 : 13}px 'Barlow', system-ui, sans-serif`;
+      ctx.fillStyle = '#d8b04a';
+      if (leader) ctx.fillText(`Führung: ${leader.name} – Stufe ${Math.min(n, Math.floor(leader.score / 100) + 1)}`, W / 2, y + h * 0.8);
     } else if (s.mode === 'dm') {
       const w = small ? 210 : 270, h = small ? 40 : 50;
       this.panel(W / 2 - w / 2, y, w, h);
@@ -1345,7 +1437,7 @@ export class Renderer {
     ctx.font = `700 ${small ? 12 : 14}px 'Barlow', system-ui, sans-serif`;
     ctx.fillStyle = '#fff';
     const ammoTxt = slot.reloadT > 0 ? 'Lädt nach …' : `${slot.ammo} / ${isFinite(slot.reserve) ? slot.reserve : '∞'}`;
-    ctx.fillText(def.name, x, y - (small ? 9 : 11));
+    ctx.fillText(`${def.name}  ·  Granaten ${me.grenades}`, x, y - (small ? 9 : 11));
     ctx.textAlign = 'right';
     ctx.fillStyle = slot.ammo === 0 ? '#c4524a' : slot.ammo <= mag * 0.25 ? '#cfa743' : '#d8b04a';
     ctx.fillText(ammoTxt, x + bw, y - (small ? 9 : 11));
@@ -1361,11 +1453,8 @@ export class Renderer {
         const active = i === me.cur;
         this.panel(cx, bottom - h, w - 6, h, 3);
         if (active) { ctx.strokeStyle = '#d8b04a'; ctx.lineWidth = 2; rr(ctx, cx, bottom - h, w - 6, h, 3); ctx.stroke(); }
-        ctx.save();
-        ctx.translate(cx + 14, bottom - h / 2 - 4);
         ctx.globalAlpha = active ? 1 : 0.55;
-        this.drawGun(s.id, 0, 1, true);
-        ctx.restore();
+        drawWeaponSide(ctx, s.id, cx + (w - 6) / 2, bottom - h / 2 - 5, 64);
         ctx.globalAlpha = active ? 1 : 0.6;
         ctx.fillStyle = '#fff';
         ctx.font = "600 10px 'Barlow', system-ui, sans-serif";
@@ -1425,12 +1514,16 @@ export class Renderer {
         ctx.beginPath(); ctx.moveTo(b.x + b.r * 0.42, b.y - b.r * 0.42); ctx.lineTo(b.x + b.r * 0.42, b.y - 1); ctx.lineTo(b.x + b.r * 0.08, b.y - b.r * 0.2); ctx.fill();
       } else if (b.id === 'swap' && me) {
         const next = me.slots[(me.cur + 1) % me.slots.length];
-        ctx.save();
-        ctx.translate(b.x - b.r * 0.6, b.y - 2);
-        this.drawGun(next?.id ?? 'pistol', 0, 0.75, true);
-        ctx.restore();
+        drawWeaponSide(ctx, next?.id ?? 'pistol', b.x, b.y - 3, b.r * 1.55);
         ctx.font = "700 9px 'Barlow', system-ui, sans-serif";
         ctx.fillText('WECHSELN', b.x, b.y + b.r * 0.62);
+      } else if (b.id === 'grenade' && me) {
+        ctx.globalAlpha = me.grenades > 0 ? 1 : 0.35;
+        drawWeaponSide(ctx, 'grenade', b.x, b.y - 4, b.r * 2.2);
+        ctx.font = "700 10px 'Barlow', system-ui, sans-serif";
+        ctx.fillStyle = '#fff';
+        ctx.fillText(`× ${me.grenades}`, b.x, b.y + b.r * 0.66);
+        ctx.globalAlpha = 1;
       }
     }
   }
@@ -1451,7 +1544,7 @@ export class Renderer {
     ctx.font = `700 ${small ? 15 : 18}px 'Barlow Condensed', 'Arial Narrow', system-ui, sans-serif`;
     ctx.fillStyle = '#d8b04a';
     const title = g.settings.mode === 'team' ? `${TEAM_NAMES[0]} ${g.teamKills[0]} : ${g.teamKills[1]} ${TEAM_NAMES[1]}`
-      : g.settings.mode === 'survival' ? `Überleben – Welle ${g.wave}` : 'Jeder gegen jeden';
+      : g.settings.mode === 'survival' ? `Überleben – Welle ${g.wave}` : g.settings.mode === 'gungame' ? 'Waffenmeister' : 'Jeder gegen jeden';
     ctx.fillText(title, x + 16, y + 28);
     ctx.font = `600 ${small ? 10 : 12}px 'Barlow', system-ui, sans-serif`;
     ctx.fillStyle = 'rgba(255,255,255,0.55)';

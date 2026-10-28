@@ -1,6 +1,6 @@
 import './styles.css';
 import {
-  IS_TEST, HATS, MAP_LIST, MAX_HUMANS, MAX_TOTAL, MatchSettings, PERKS, SKINS, WEAPONS, WEAPON_LIST, WeaponId, PerkId,
+  IS_TEST, isFfa, HATS, MAP_LIST, MAX_HUMANS, MAX_TOTAL, MatchSettings, PERKS, SKINS, WEAPONS, WEAPON_LIST, WeaponId, PerkId,
   defaultSettings, levelInfo, MapId,
 } from './config';
 import { Game, MatchResult, PlayerInfo, PlayerInput, emptyInput, sameTeam } from './game';
@@ -250,23 +250,23 @@ function startLocalMatch() {
   const s = { ...session.settings };
   const humans = session.members.length;
   const online = session.kind === 'host';
-  if (s.mode === 'dm' && s.bots === 0 && humans < 2) {
+  if (isFfa(s.mode) && s.bots === 0 && humans < 2) {
     ui.toast('Ohne Bots braucht ihr mindestens 2 Spieler.', 3500);
     showLobby();
     return;
   }
   // online free-for-all may be friends only (0 bots); solo needs at least one bot
-  if (s.mode === 'dm') s.bots = Math.max(online ? 0 : 1, Math.min(s.bots, MAX_TOTAL - humans));
+  if (isFfa(s.mode)) s.bots = Math.max(online ? 0 : 1, Math.min(s.bots, MAX_TOTAL - humans));
   if (s.mode === 'team') {
     s.bots = Math.max(1, Math.min(s.bots, MAX_TOTAL - humans));
     s.allies = Math.max(0, Math.min(s.allies, MAX_TOTAL - humans - s.bots));
   }
   const mapId: MapId = s.map === 'random' ? pick(MAP_LIST) : s.map;
-  const total = humans + (s.mode === 'dm' ? s.bots : s.mode === 'team' ? s.bots + s.allies : 6);
+  const total = humans + (isFfa(s.mode) ? s.bots : s.mode === 'team' ? s.bots + s.allies : 6);
   const size = s.mapSize === 'small' ? 0 : s.mapSize === 'medium' ? 1 : s.mapSize === 'large' ? 2 : mapSizeFor(total);
   const seed = (Math.random() * 2 ** 31) | 0;
   const g = new Game({ authority: true, settings: s, seed, mapId, size, localId: session.myId });
-  const team = s.mode === 'dm' ? -1 : 0;
+  const team = isFfa(s.mode) ? -1 : 0;
   for (const m of session.members) g.addPlayer(infoOf(m, team), true);
   g.populateBots();
   g.fx.length = 0;
@@ -408,7 +408,7 @@ function hostOnMessage(l: Link, m: Msg) {
       const g = s.game;
       if (g && !g.over) {
         // late join into the running match
-        g.addPlayer(infoOf(mem, g.settings.mode === 'dm' ? -1 : 0), true);
+        g.addPlayer(infoOf(mem, isFfa(g.settings.mode) ? -1 : 0), true);
         l.send({ t: 'start', seed: g.seed, mapId: g.mapId, size: g.size, settings: g.settings, you: l.id, full: g.fullState() });
       }
       broadcastLobby();
@@ -448,7 +448,7 @@ function hostOnLeave(l: Link) {
   const g = s.game;
   g?.removePlayer(l.id);
   // a friends-only free-for-all cannot go on alone
-  if (g && !g.over && g.settings.mode === 'dm' && !g.list.some((p) => p.bot) && g.list.length < 2) {
+  if (g && !g.over && isFfa(g.settings.mode) && !g.list.some((p) => p.bot) && g.list.length < 2) {
     g.emit({ e: 'msg', text: 'Alle Mitspieler sind weg' });
     g.finish();
   }
@@ -483,7 +483,7 @@ function renderLobbyScreen() {
     renderLobbyScreen();
   }, true);
   const startBtn = $<HTMLButtonElement>('lobby-start');
-  const needFriends = s.settings.mode === 'dm' && s.settings.bots === 0 && s.members.length < 2;
+  const needFriends = isFfa(s.settings.mode) && s.settings.bots === 0 && s.members.length < 2;
   startBtn.disabled = needFriends;
   startBtn.textContent = needFriends ? 'Warte auf Mitspieler …'
     : s.members.length > 1 ? `Spiel starten (${s.members.length} Spieler)` : 'Spiel starten (allein)';
@@ -657,6 +657,8 @@ function step(dt: number, draw: boolean) {
     if (me && me.alive && !paused && !g.over && draw) {
       const sp = renderer.toScreen(me.x, me.y);
       inp = input.read(sp.x, sp.y, dt, assist);
+      // mouse: grenades land roughly where the cursor points
+      if (inp.throw && !input.touchMode && input.mouse.seen) inp.throwDist = Math.hypot(input.mouse.x - sp.x, input.mouse.y - sp.y) / renderer.zoom;
     } else if (me && me.alive && !g.over) {
       inp = { ...emptyInput(), aim: me.aim };
     }
@@ -666,7 +668,7 @@ function step(dt: number, draw: boolean) {
       let first = true;
       while (rem > 1e-4) {
         const st = Math.min(rem, 1 / 30);
-        g.update(st, inp && !first ? { ...inp, reload: false, next: false, slot: -1 } : inp);
+        g.update(st, inp && !first ? { ...inp, reload: false, next: false, slot: -1, throw: false } : inp);
         rem -= st;
         first = false;
       }

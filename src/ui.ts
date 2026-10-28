@@ -1,6 +1,6 @@
 // DOM menus: screens, settings forms, loadout, progress, lobby and results.
 import {
-  DIFFS, DIFF_LIST, HATS, MAP_LIST, MAP_SIZE_LIST, MAPS, MapSizeId, MAX_HUMANS, MAX_TOTAL, MODES, MODE_LIST, MatchSettings, PERKS, SKINS,
+  isFfa, GUN_TIERS, DIFFS, DIFF_LIST, HATS, MAP_LIST, MAP_SIZE_LIST, MAPS, MapSizeId, MAX_HUMANS, MAX_TOTAL, MODES, MODE_LIST, MatchSettings, PERKS, SKINS,
   TEAM_NAMES, WEAPONS, WEAPON_LIST, WeaponId, allUnlocks, defaultSettings, levelInfo, xpToNext, MAX_LEVEL,
 } from './config';
 import type { MatchResult } from './game';
@@ -42,7 +42,8 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 /** online=true: friends lobby – "Jeder gegen jeden" can be played with or without bots. */
 export function renderSettingsForm(root: HTMLElement, s: MatchSettings, editable: boolean, humans: number, onChange: (s: MatchSettings) => void, online = false) {
   root.innerHTML = '';
-  const noBots = s.mode === 'dm' && s.bots === 0;
+  const ffa = isFfa(s.mode);
+  const noBots = ffa && s.bots === 0;
   const set = (patch: Partial<MatchSettings>) => onChange({ ...s, ...patch });
 
   const modeField = el('div', 'field');
@@ -97,15 +98,16 @@ export function renderSettingsForm(root: HTMLElement, s: MatchSettings, editable
   seg('Karte', [{ v: 'random', t: 'Zufall' }, ...MAP_LIST.map((m) => ({ v: m, t: MAPS[m].name }))], s.map as string, (v) => set({ map: v as MatchSettings['map'] }), two);
   seg('Kartengröße', MAP_SIZE_LIST.map((z) => ({ v: z.id, t: z.name })), (s.mapSize ?? 'auto') as string, (v) => set({ mapSize: v as MapSizeId }), two);
   const room = Math.max(0, MAX_TOTAL - Math.max(humans, 1));
-  if (online && s.mode === 'dm') {
+  if (online && ffa) {
     seg('Gegner', [{ v: 0, t: 'Nur Freunde' }, { v: 1, t: 'Mit Bots' }], noBots ? 0 : 1,
       (v) => set({ bots: v === 0 ? 0 : Math.max(1, Math.min(4, room)) }), two);
   }
   if (!noBots) seg('Schwierigkeit (Bots)', DIFF_LIST.map((d) => ({ v: d, t: DIFFS[d].name })), s.diff as string, (v) => set({ diff: v as MatchSettings['diff'] }), two);
-  if (s.mode === 'dm') {
+  if (ffa) {
     if (noBots) two.append(el('p', 'muted', humans < 2 ? 'Nur ihr, ohne Bots. Es fehlen noch Mitspieler (mindestens 2).' : `Nur ihr ${humans}, ohne Bots.`));
     else stepper('Bots', s.bots, 1, Math.min(9, room), (v) => set({ bots: v }), two);
-    seg('Kill-Limit', [10, 15, 20, 30].map((v) => ({ v, t: String(v) })), s.killLimit, (v) => set({ killLimit: v }), two);
+    if (s.mode === 'dm') seg('Kill-Limit', [10, 15, 20, 30].map((v) => ({ v, t: String(v) })), s.killLimit, (v) => set({ killLimit: v }), two);
+    else two.append(el('p', 'muted', 'Waffenfolge: ' + GUN_TIERS.map((w) => WEAPONS[w].name).join(' → ')));
     seg('Zeitlimit', [180, 300, 480, 600].map((v) => ({ v, t: v / 60 + ' min' })), s.timeLimit, (v) => set({ timeLimit: v }), two);
   } else if (s.mode === 'team') {
     stepper('Gegner-Bots (Team Rot)', s.bots, 1, Math.min(8, room - s.allies), (v) => set({ bots: v }), two);
@@ -256,7 +258,7 @@ export function renderResults(res: MatchResult, myId: string, rep: XpReport | nu
   const row = res.rows.find((r) => r.id === myId);
   let t = 'Match vorbei';
   let cls = '';
-  if (res.mode === 'dm') {
+  if (res.mode === 'dm' || res.mode === 'gungame') {
     if (row?.place === 1) { t = 'Sieg'; cls = 'win'; } else { t = `Platz ${row?.place ?? '-'}`; cls = row && row.place <= 3 ? '' : 'lose'; }
   } else if (res.mode === 'team') {
     if (res.winnerTeam === 0) { t = 'Teamsieg'; cls = 'win'; } else if (res.winnerTeam === null) t = 'Unentschieden'; else { t = 'Niederlage'; cls = 'lose'; }

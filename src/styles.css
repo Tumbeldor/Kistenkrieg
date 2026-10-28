@@ -153,7 +153,7 @@ textarea { font-size: 12px; font-family: ui-monospace, monospace; margin-top: 10
 .seg button.on { background: var(--accent-dim); border-color: var(--accent); color: #e3c978; }
 .seg button:disabled { cursor: default; }
 .seg button:disabled:not(.on) { opacity: 0.45; }
-.mode-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.mode-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .mode-card {
   appearance: none; text-align: left; border: 1px solid var(--line2); background: #15181c; color: var(--text);
   border-radius: 2px; padding: 10px 12px; cursor: pointer; font: 14px var(--body);
@@ -282,7 +282,7 @@ kbd { display: inline-block; min-width: 22px; padding: 1px 6px; margin: 0 2px 2p
 /* compact layouts: phones */
 @media (max-width: 760px) {
   .menu-grid, .online-grid, .lobby-grid, .help-grid, .results-grid { grid-template-columns: 1fr; }
-  .mode-cards { grid-template-columns: 1fr; }
+  .mode-cards { grid-template-columns: 1fr 1fr; }
   .two-col { grid-template-columns: 1fr; }
 }
 @media (max-height: 500px) and (orientation: landscape) {
@@ -299,7 +299,7 @@ kbd { display: inline-block; min-width: 22px; padding: 1px 6px; margin: 0 2px 2p
   .panel { padding: 12px 14px; }
   .lobby-grid { grid-template-columns: 240px 1fr; gap: 12px; }
   .online-grid, .help-grid, .results-grid { grid-template-columns: 1fr 1fr; }
-  .mode-cards { grid-template-columns: repeat(3, 1fr); }
+  .mode-cards { grid-template-columns: repeat(4, 1fr); }
   .mode-card span { display: none; }
   .room-code { font-size: 36px; }
   .two-col { grid-template-columns: 1fr 1fr; }

@@ -108,7 +108,7 @@ export function computeXp(res: MatchResult, myId: string, settings: MatchSetting
   const place = row?.place ?? 0;
   if (kills) lines.push({ label: `${kills} Eliminierungen`, xp: kills * XP.kill });
   lines.push({ label: 'Match beendet', xp: XP.finish });
-  if (res.mode === 'dm') {
+  if (res.mode === 'dm' || res.mode === 'gungame') {
     if (place === 1) { lines.push({ label: '1. Platz', xp: XP.win }); won = true; }
     else if (place === 2) lines.push({ label: '2. Platz', xp: XP.second });
     else if (place === 3 && res.rows.length > 3) lines.push({ label: '3. Platz', xp: XP.third });
@@ -120,7 +120,7 @@ export function computeXp(res: MatchResult, myId: string, settings: MatchSetting
     won = res.wave >= 5;
   }
   let total = lines.reduce((s, l) => s + l.xp, 0);
-  const withBots = res.mode !== 'dm' || res.rows.some((r) => r.bot);
+  const withBots = (res.mode !== 'dm' && res.mode !== 'gungame') || res.rows.some((r) => r.bot);
   const dm = withBots ? DIFFS[settings.diff].xp : 1;
   if (dm !== 1) {
     const extra = Math.round(total * (dm - 1));

@@ -252,6 +252,67 @@ export function sfxShot(w: WeaponId, vol: number, pan: number, far = 0) {
       burst(o, 0.5, 900, 150, 0.6, 0.35, 'lowpass', 0.02);
       break;
     }
+    case 'revolver': {
+      const o = bus(vol, pan, 0.35, far);
+      burst(o, 0.05, 2000 * v, 1200, 0.7, 1.05, 'highpass');
+      burst(o, 0.2, 900 * v, 220, 0.8, 0.9);
+      tone(o, 'sine', 120 * v, 42, 0.18, 0.85);
+      burst(o, 0.55, 600, 150, 0.5, 0.22, 'lowpass', 0.02);
+      break;
+    }
+    case 'smgsil': {
+      // suppressed: dull thump, action clack, almost no crack
+      const o = bus(vol * 0.55, pan, 0.03, far);
+      burst(o, 0.05, 700 * v, 250, 0.8, 0.6, 'lowpass');
+      tone(o, 'sine', 210 * v, 90, 0.04, 0.3);
+      burst(o, 0.02, 3200, 2200, 3, 0.18, 'bandpass', 0.012);
+      break;
+    }
+    case 'crossbow': {
+      const o = bus(vol * 0.7, pan, 0.05, far);
+      tone(o, 'triangle', 190 * v, 110, 0.16, 0.35);
+      tone(o, 'sine', 95, 70, 0.12, 0.3);
+      burst(o, 0.09, 2600, 900, 1.5, 0.3, 'bandpass');
+      break;
+    }
+    case 'dmr': {
+      const o = bus(vol, pan, 0.5, far);
+      burst(o, 0.07, 1800 * v, 1000, 0.7, 1.1, 'highpass');
+      burst(o, 0.025, 6000, 3800, 1, 0.45, 'highpass');
+      burst(o, 0.4, 1200 * v, 140, 0.7, 1.0, 'lowpass');
+      tone(o, 'sine', 105 * v, 36, 0.3, 0.95);
+      burst(o, 0.9, 480, 120, 0.5, 0.28, 'lowpass', 0.03);
+      break;
+    }
+    case 'lmg': {
+      const o = bus(vol * 0.95, pan, 0.3, far);
+      burst(o, 0.05, 1800 * v, 1000, 0.7, 0.95, 'highpass');
+      burst(o, 0.16, 800 * v, 220, 0.8, 0.8);
+      tone(o, 'sine', 125 * v, 45, 0.12, 0.75);
+      break;
+    }
+    case 'autoshotgun': {
+      const o = bus(vol, pan, 0.4, far);
+      burst(o, 0.07, 1100 * v, 550, 0.6, 0.95, 'highpass');
+      burst(o, 0.3, 1600 * v, 120, 0.7, 1.1, 'lowpass');
+      tone(o, 'sine', 108 * v, 34, 0.24, 0.95);
+      break;
+    }
+    case 'gl': {
+      // "thoomp" of a grenade launcher
+      const o = bus(vol * 0.9, pan, 0.25, far);
+      tone(o, 'sine', 150 * v, 55, 0.2, 1.0);
+      burst(o, 0.14, 600, 200, 0.8, 0.55, 'lowpass');
+      burst(o, 0.04, 2400, 1500, 2, 0.15, 'bandpass', 0.02);
+      break;
+    }
+    case 'grenade': {
+      // pin + throw swoosh
+      const o = bus(vol * 0.6, pan, 0.05, far);
+      burst(o, 0.03, 3200, 2400, 3, 0.25, 'bandpass');
+      burst(o, 0.22, 500, 1600, 0.8, 0.25, 'bandpass', 0.05);
+      break;
+    }
   }
 }
 
@@ -364,6 +425,32 @@ export function sfxReload(w: WeaponId = 'rifle', dur = 1.5) {
       burst(o, 0.3, 650, 300, 1, 0.3, 'bandpass', at(0.28));
       thunk(o, at(0.62), 0.9);
       clack(o, at(0.88), 0.55);
+      break;
+    case 'revolver':
+      clack(o, 0.03, 0.35);
+      for (let i = 0; i < 6; i++) click(o, at(0.25 + i * 0.07), rnd(2600, 3200), 0.25);
+      clack(o, at(0.88), 0.45);
+      break;
+    case 'crossbow':
+      burst(o, at(0.6), 1200, 400, 1.5, 0.18, 'bandpass', 0.05);
+      tone(o, 'triangle', 160, 260, at(0.6), 0.08, 0.05);
+      clack(o, at(0.75), 0.5);
+      click(o, at(0.9), 2600, 0.3);
+      break;
+    case 'gl':
+      clack(o, 0.05, 0.5);
+      for (let i = 0; i < 6; i++) thunk(o, at(0.18 + i * 0.1), 0.35);
+      clack(o, at(0.9), 0.55);
+      break;
+    case 'smgsil':
+    case 'dmr':
+    case 'lmg':
+    case 'autoshotgun':
+      click(o, 0.02);
+      burst(o, 0.15, 1000, 400, 1, 0.12, 'bandpass', 0.1);
+      thunk(o, at(0.5), w === 'lmg' ? 0.8 : 0.6);
+      clack(o, at(0.8), 0.5);
+      if (w === 'lmg') clack(o, at(0.9), 0.5);
       break;
     case 'rail':
       tone(o, 'sine', 280, 1900, dur * 0.85, 0.14);

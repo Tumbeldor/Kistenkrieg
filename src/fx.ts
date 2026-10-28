@@ -100,8 +100,9 @@ export class Fx {
         const def = WEAPONS[ev.w];
         const [v, pan, far] = this.spatial(ev.x, ev.y);
         sfx.sfxShot(ev.w, Math.min(1, v * (ev.p === local ? 1 : 0.85)), pan, far);
-        if (def.kind !== 'flame') {
-          this.flashes.push({ x: ev.x, y: ev.y, a: ev.a[0], life: 0.06, size: def.pellets > 1 ? 1.5 : def.id === 'sniper' ? 1.6 : 1 });
+        if (def.kind !== 'flame' && def.kind !== 'grenade' && ev.w !== 'crossbow') {
+          const size = def.silent ? 0.4 : def.pellets > 1 ? 1.5 : def.id === 'sniper' || def.id === 'dmr' ? 1.6 : 1;
+          this.flashes.push({ x: ev.x, y: ev.y, a: ev.a[0], life: 0.06, size });
           if (def.kind === 'bullet') {
             const a = ev.a[0] + Math.PI / 2;
             this.add({ x: ev.x, y: ev.y, vx: Math.cos(a) * rand(60, 140), vy: Math.sin(a) * rand(60, 140), kind: 'shell', color: '#e0b04a', life: 0.6, size: 3, vr: rand(-15, 15), drag: 5 });
@@ -219,6 +220,11 @@ export class Fx {
       case 'leave': {
         const p = g.players.get(ev.p);
         if (p && !p.bot) this.feed.push({ kn: '', kc: '#ccc', vn: p.name, vc: '#d9958c', w: '', t: 4, mine: false, info: 'hat das Spiel verlassen' });
+        break;
+      }
+      case 'arm': {
+        const p = g.players.get(ev.p);
+        if (p && ev.p === local) this.message(WEAPONS[p.wid].name, `Stufe ${ev.tier + 1}`, '#d8b04a', 1.6);
         break;
       }
       case 'wave':

@@ -3,8 +3,9 @@
 /** Test build (experiment branch, published under /test/): own save game and own rooms. */
 export const IS_TEST = import.meta.env.VITE_CHANNEL === 'test';
 
-export type WeaponId = 'pistol' | 'smg' | 'shotgun' | 'rifle' | 'sniper' | 'flamer' | 'minigun' | 'rocket' | 'rail';
-export type WeaponKind = 'bullet' | 'rocket' | 'flame' | 'beam';
+export type WeaponId = 'pistol' | 'smg' | 'shotgun' | 'rifle' | 'sniper' | 'flamer' | 'minigun' | 'rocket' | 'rail'
+  | 'revolver' | 'crossbow' | 'smgsil' | 'dmr' | 'lmg' | 'autoshotgun' | 'gl' | 'grenade';
+export type WeaponKind = 'bullet' | 'rocket' | 'flame' | 'beam' | 'grenade';
 
 export interface WeaponDef {
   id: WeaponId;
@@ -32,12 +33,14 @@ export interface WeaponDef {
   botRange: number;
   spinUp: number;
   pickupAmmo: number;
+  silent: boolean; // bots do not hear it, does not reveal the shooter
+  fuse: number; // grenades: seconds until detonation
 }
 
 const W = (d: Partial<WeaponDef> & Pick<WeaponDef, 'id' | 'name' | 'desc' | 'unlock'>): WeaponDef => ({
   kind: 'bullet', dmg: 10, rate: 5, mag: 10, reload: 1.5, pellets: 1, spread: 0.05, speed: 1500, range: 900,
   moveMul: 1, pierce: 0, splash: 0, splashDmg: 0, crateMul: 1, shake: 2, color: '#ffe3a1', len: 18, thick: 7,
-  botRange: 380, spinUp: 0, pickupAmmo: 30, ...d,
+  botRange: 380, spinUp: 0, pickupAmmo: 30, silent: false, fuse: 0, ...d,
 });
 
 export const WEAPONS: Record<WeaponId, WeaponDef> = {
@@ -68,17 +71,47 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
   rail: W({ id: 'rail', name: 'Railgun', desc: 'Sofortiger Energiestrahl, durchdringt Gegner und Kisten.', unlock: 20, kind: 'beam',
     dmg: 75, rate: 1.0, mag: 4, reload: 2.1, spread: 0, speed: 0, range: 2000, moveMul: 0.92, pierce: 99,
     crateMul: 1.5, shake: 6, color: '#7cf5ff', len: 34, thick: 7, botRange: 700, pickupAmmo: 10 }),
+  revolver: W({ id: 'revolver', name: 'Revolver', desc: 'Sechs Schuss, jeder davon sitzt.', unlock: 2,
+    dmg: 46, rate: 1.9, mag: 6, reload: 2.0, spread: 0.02, speed: 1700, range: 1000, moveMul: 1.03,
+    shake: 3.5, len: 16, thick: 6, botRange: 400, pickupAmmo: 18 }),
+  crossbow: W({ id: 'crossbow', name: 'Armbrust', desc: 'Lautlos und tödlich. Bots hören dich nicht.', unlock: 6,
+    dmg: 80, rate: 1.0, mag: 1, reload: 1.15, spread: 0.006, speed: 1250, range: 1400, moveMul: 0.97, silent: true,
+    crateMul: 0.6, shake: 1, color: '#d9d2c0', len: 26, thick: 7, botRange: 520, pickupAmmo: 8 }),
+  smgsil: W({ id: 'smgsil', name: 'Schalldämpfer-MP', desc: 'Leise Maschinenpistole. Verrät dich nicht im Busch.', unlock: 9,
+    dmg: 10, rate: 11, mag: 30, reload: 1.5, spread: 0.09, speed: 1350, range: 700, silent: true,
+    shake: 1, color: '#e8dcb0', len: 26, thick: 7, botRange: 300, pickupAmmo: 90 }),
+  dmr: W({ id: 'dmr', name: 'Präzisionsgewehr', desc: 'Halbautomatisch, große Reichweite, hoher Schaden.', unlock: 12,
+    dmg: 42, rate: 2.6, mag: 10, reload: 2.0, spread: 0.01, speed: 2600, range: 1500, moveMul: 0.92,
+    shake: 3.5, color: '#fff2b8', len: 32, thick: 6, botRange: 620, pickupAmmo: 30 }),
+  lmg: W({ id: 'lmg', name: 'Maschinengewehr', desc: 'Großes Magazin für Dauerfeuer. Macht etwas langsamer.', unlock: 15,
+    dmg: 15, rate: 10, mag: 80, reload: 3.6, spread: 0.08, speed: 1700, range: 1000, moveMul: 0.82,
+    shake: 2.2, color: '#ffe08a', len: 30, thick: 9, botRange: 460, pickupAmmo: 160 }),
+  autoshotgun: W({ id: 'autoshotgun', name: 'Automatik-Schrotflinte', desc: 'Schrot im Dauerfeuer – auf kurze Distanz unschlagbar.', unlock: 18,
+    dmg: 9, pellets: 7, rate: 3.6, mag: 10, reload: 2.4, spread: 0.3, speed: 1200, range: 430, moveMul: 0.93,
+    shake: 4, color: '#ffcf8a', len: 24, thick: 9, botRange: 170, pickupAmmo: 30 }),
+  gl: W({ id: 'gl', name: 'Granatwerfer', desc: 'Granaten prallen von Wänden ab und explodieren nach kurzer Zeit.', unlock: 22, kind: 'grenade',
+    dmg: 25, splash: 115, splashDmg: 80, rate: 1.3, mag: 6, reload: 3.0, spread: 0.02, speed: 820, range: 99999, fuse: 1.1, moveMul: 0.9,
+    crateMul: 2.5, shake: 4, color: '#9aa37a', len: 24, thick: 11, botRange: 420, pickupAmmo: 12 }),
+  grenade: W({ id: 'grenade', name: 'Handgranate', desc: 'Wurfgeschoss mit Zeitzünder.', unlock: 999, kind: 'grenade',
+    dmg: 0, splash: 130, splashDmg: 95, rate: 99, mag: 1, spread: 0, speed: 700, range: 99999, fuse: 1.5,
+    crateMul: 3, shake: 0, color: '#6b7350', len: 4, thick: 4, botRange: 400, pickupAmmo: 0 }),
 };
-export const WEAPON_LIST: WeaponId[] = ['pistol', 'smg', 'shotgun', 'rifle', 'sniper', 'flamer', 'minigun', 'rocket', 'rail'];
-export const PICKUP_WEAPONS: WeaponId[] = ['shotgun', 'sniper', 'flamer', 'minigun', 'rocket', 'rail'];
+/** Selectable weapons, ordered by unlock level (the hand grenade is not a weapon slot). */
+export const WEAPON_LIST: WeaponId[] = ['pistol', 'smg', 'revolver', 'shotgun', 'rifle', 'crossbow', 'sniper', 'smgsil', 'flamer',
+  'dmr', 'minigun', 'lmg', 'rocket', 'autoshotgun', 'rail', 'gl'];
+export const PICKUP_WEAPONS: WeaponId[] = ['shotgun', 'sniper', 'flamer', 'minigun', 'rocket', 'rail', 'dmr', 'lmg', 'autoshotgun', 'crossbow', 'gl'];
+/** "Waffenmeister": every kill advances to the next weapon, a kill with the last one wins. */
+export const GUN_TIERS: WeaponId[] = ['rifle', 'smg', 'autoshotgun', 'lmg', 'shotgun', 'dmr', 'smgsil', 'minigun', 'sniper', 'flamer', 'crossbow', 'revolver', 'pistol'];
+export const GRENADES = 2;
 
-export type PerkId = 'none' | 'tough' | 'swift' | 'reload' | 'mag' | 'vamp' | 'regen' | 'blast';
+export type PerkId = 'none' | 'tough' | 'swift' | 'reload' | 'grenadier' | 'mag' | 'vamp' | 'regen' | 'blast';
 export interface PerkDef { id: PerkId; name: string; desc: string; unlock: number }
 export const PERKS: PerkDef[] = [
   { id: 'none', name: 'Kein Perk', desc: 'Standardausrüstung ohne Extras.', unlock: 1 },
   { id: 'tough', name: 'Abgehärtet', desc: '+25 maximale Lebenspunkte.', unlock: 4 },
   { id: 'swift', name: 'Leichtes Gepäck', desc: '+12 % Laufgeschwindigkeit.', unlock: 6 },
   { id: 'reload', name: 'Schnellladen', desc: 'Nachladen 35 % schneller.', unlock: 9 },
+  { id: 'grenadier', name: 'Grenadier', desc: '+2 Handgranaten pro Leben.', unlock: 7 },
   { id: 'mag', name: 'Erweiterte Magazine', desc: '+40 % Magazingröße.', unlock: 12 },
   { id: 'vamp', name: 'Adrenalin', desc: '+25 LP für jede Eliminierung.', unlock: 15 },
   { id: 'regen', name: 'Feldsanitäter', desc: 'Heilt 6 LP/s, wenn du 4 s keinen Schaden nimmst.', unlock: 19 },
@@ -141,21 +174,26 @@ export const DIFFS: Record<DiffId, DiffDef> = {
 };
 export const DIFF_LIST: DiffId[] = ['easy', 'normal', 'hard', 'insane'];
 
-export type ModeId = 'dm' | 'team' | 'survival';
+export type ModeId = 'dm' | 'team' | 'survival' | 'gungame';
 export const MODES: Record<ModeId, { id: ModeId; name: string; desc: string; coop: boolean }> = {
   dm: { id: 'dm', name: 'Jeder gegen jeden', desc: 'Freie Schlacht gegen Freunde und Bots. Wer zuerst das Kill-Limit erreicht, gewinnt.', coop: false },
   team: { id: 'team', name: 'Team vs. Bots', desc: 'Koop: Ihr spielt zusammen als Team gegen ein Bot-Team.', coop: true },
   survival: { id: 'survival', name: 'Überleben', desc: 'Koop: Haltet so viele Bot-Wellen wie möglich durch. Alle 5 Wellen kommt ein Boss.', coop: true },
+  gungame: { id: 'gungame', name: 'Waffenmeister', desc: 'Jede Eliminierung bringt dich zur nächsten Waffe. Wer zuerst alle 13 Stufen schafft, gewinnt.', coop: false },
 };
-export const MODE_LIST: ModeId[] = ['dm', 'team', 'survival'];
+export const MODE_LIST: ModeId[] = ['dm', 'gungame', 'team', 'survival'];
+/** Free-for-all modes (everyone against everyone, optional bots). */
+export const isFfa = (m: ModeId) => m === 'dm' || m === 'gungame';
 
-export type MapId = 'lager' | 'wald' | 'wueste';
+export type MapId = 'lager' | 'wald' | 'wueste' | 'winter' | 'stadt';
 export const MAPS: Record<MapId, { id: MapId; name: string }> = {
   lager: { id: 'lager', name: 'Lagerhalle' },
   wald: { id: 'wald', name: 'Wald' },
   wueste: { id: 'wueste', name: 'Wüste' },
+  winter: { id: 'winter', name: 'Winter' },
+  stadt: { id: 'stadt', name: 'Stadt' },
 };
-export const MAP_LIST: MapId[] = ['lager', 'wald', 'wueste'];
+export const MAP_LIST: MapId[] = ['lager', 'wald', 'wueste', 'winter', 'stadt'];
 
 export type MapSizeId = 'auto' | 'small' | 'medium' | 'large';
 export const MAP_SIZE_LIST: { id: MapSizeId; name: string }[] = [
@@ -178,7 +216,7 @@ export const defaultSettings = (mode: ModeId = 'dm'): MatchSettings => ({
   bots: mode === 'team' ? 5 : 4,
   allies: mode === 'team' ? 1 : 0,
   killLimit: mode === 'team' ? 30 : 15,
-  timeLimit: mode === 'team' ? 420 : 300,
+  timeLimit: mode === 'team' ? 420 : mode === 'gungame' ? 480 : 300,
 });
 
 export const MAX_HUMANS = 4;

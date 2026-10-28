@@ -13,7 +13,7 @@ export interface Stick {
   startT: number;
   moved: number;
 }
-export interface TouchButton { id: 'reload' | 'swap' | 'score' | 'pause'; x: number; y: number; r: number; touch: number | null }
+export interface TouchButton { id: 'reload' | 'swap' | 'score' | 'pause' | 'grenade'; x: number; y: number; r: number; touch: number | null }
 
 const newStick = (): Stick => ({ id: null, bx: 0, by: 0, x: 0, y: 0, dx: 0, dy: 0, mag: 0, startT: 0, moved: 0 });
 
@@ -28,6 +28,7 @@ export class Input {
   private reloadEdge = false;
   private nextEdge = false;
   private slotEdge = -1;
+  private throwEdge = false;
   pauseEdge = false;
   scoreHeld = false;
   scoreToggle = false;
@@ -49,6 +50,7 @@ export class Input {
       if (k === 'q' || k === 'e') this.nextEdge = true;
       if (k === '1' || k === '2' || k === '3') this.slotEdge = Number(k) - 1;
       if (k === 'escape' || k === 'p') this.pauseEdge = true;
+      if (k === 'g') this.throwEdge = true;
     });
     window.addEventListener('keyup', (e) => {
       const k = e.key.toLowerCase();
@@ -59,6 +61,7 @@ export class Input {
     canvas.addEventListener('mousemove', (e) => { this.mouse.x = e.clientX; this.mouse.y = e.clientY; this.mouse.seen = true; });
     canvas.addEventListener('mousedown', (e) => {
       if (e.button === 0) this.mouse.down = true;
+      if (e.button === 2 && this.enabled) this.throwEdge = true;
       this.mouse.x = e.clientX; this.mouse.y = e.clientY;
       this.touchMode = false;
     });
@@ -90,6 +93,7 @@ export class Input {
       { id: 'score', x: W - safeR - 84, y: 30, r: 22, touch: null },
       { id: 'reload', x: rx, y: reloadY, r: br, touch: null },
       { id: 'swap', x: rx, y: swapY, r: br, touch: null },
+      { id: 'grenade', x: rx - br * 2 - gap, y: swapY, r: br * 0.85, touch: null },
     ];
     for (const b of this.buttons) b.touch = prev.get(b.id) ?? null;
     void safeL;
@@ -106,6 +110,7 @@ export class Input {
         btn.touch = t.identifier;
         if (btn.id === 'reload') this.reloadEdge = true;
         if (btn.id === 'swap') this.nextEdge = true;
+        if (btn.id === 'grenade') this.throwEdge = true;
         if (btn.id === 'score') this.scoreToggle = !this.scoreToggle;
         if (btn.id === 'pause') this.pauseEdge = true;
         continue;
@@ -159,10 +164,11 @@ export class Input {
    * assist(angle) may return a corrected aim angle (touch aim assist / tap auto-aim).
    */
   read(px: number, py: number, dt: number, assist: (a: number | null) => number | null): PlayerInput {
-    const inp: PlayerInput = { mx: 0, my: 0, aim: this.lastAim, fire: false, reload: this.reloadEdge, next: this.nextEdge, slot: this.slotEdge, };
+    const inp: PlayerInput = { mx: 0, my: 0, aim: this.lastAim, fire: false, reload: this.reloadEdge, next: this.nextEdge, slot: this.slotEdge, throw: this.throwEdge, throwDist: 0 };
     this.reloadEdge = false;
     this.nextEdge = false;
     this.slotEdge = -1;
+    this.throwEdge = false;
     if (this.touchMode) {
       const m = this.moveStick;
       if (m.id !== null && m.mag > 0.12) { inp.mx = m.dx; inp.my = m.dy; }

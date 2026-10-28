@@ -30,7 +30,7 @@ export class Bot {
   private nudgeT = 0;
   private burstT = 0;
   private pauseT = 0;
-  private input: PlayerInput = { mx: 0, my: 0, aim: 0, fire: false, reload: false, next: false, slot: -1 };
+  private input: PlayerInput = { mx: 0, my: 0, aim: 0, fire: false, reload: false, next: false, slot: -1, throw: false, throwDist: 0 };
 
   constructor(readonly diff: DiffDef) {}
 
@@ -66,6 +66,7 @@ export class Bot {
     inp.reload = false;
     inp.next = false;
     inp.slot = -1;
+    inp.throw = false;
     const now = performance.now() / 1000;
 
     this.thinkT -= dt;
@@ -111,7 +112,7 @@ export class Bot {
       // fire control
       const off = Math.abs(angleDiff(this.aim, exact));
       const tol = 0.1 + def.spread * 0.5 + (dd < 160 ? 0.25 : 0);
-      const tooClose = def.kind === 'rocket' && dd < 150;
+      const tooClose = (def.kind === 'rocket' || def.kind === 'grenade') && dd < 160;
       if (this.seenT >= d.reaction && off < tol && dd < def.range * 0.95 && !tooClose && t.protectT <= 0) {
         if (d.id === 'easy') {
           if (this.pauseT > 0) this.pauseT -= dt;
@@ -121,6 +122,11 @@ export class Bot {
             if (this.burstT > 0.6) { this.burstT = 0; this.pauseT = rand(0.4, 0.9); }
           }
         } else inp.fire = true;
+      }
+      // grenades at medium range (smarter bots more often)
+      if (me.grenades > 0 && dd > 220 && dd < 520 && this.seenT > d.reaction && Math.random() < dt * (d.smart ? 0.25 : 0.06)) {
+        inp.throw = true;
+        inp.throwDist = dd + rand(-40, 40) * (1 - d.lead * 0.5);
       }
       // weak bots run away to a medkit on smart difficulties
       if (d.smart && me.hp < me.maxHp * 0.3) {
