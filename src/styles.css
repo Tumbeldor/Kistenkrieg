@@ -65,6 +65,15 @@ h3 .muted { text-transform: none; letter-spacing: 0.02em; font-family: var(--bod
 .col { display: flex; flex-direction: column; gap: 10px; }
 .grow { flex: 1; }
 
+/* test build marker */
+.test-build .tagline::after { content: ' · Testversion'; color: #d9796e; }
+body.test-build:not(.in-match)::after {
+  content: 'TESTVERSION'; position: fixed; z-index: 20; pointer-events: none;
+  top: max(6px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
+  font: 700 11px var(--head); letter-spacing: 0.25em; color: #d9796e;
+  border: 1px solid rgba(217, 121, 110, 0.6); padding: 2px 8px; background: rgba(12, 14, 17, 0.8);
+}
+
 /* buttons */
 .btn {
   appearance: none; border: 1px solid var(--line2); border-radius: 3px;

@@ -1,6 +1,6 @@
 import './styles.css';
 import {
-  HATS, MAP_LIST, MAX_HUMANS, MAX_TOTAL, MatchSettings, PERKS, SKINS, WEAPONS, WEAPON_LIST, WeaponId, PerkId,
+  IS_TEST, HATS, MAP_LIST, MAX_HUMANS, MAX_TOTAL, MatchSettings, PERKS, SKINS, WEAPONS, WEAPON_LIST, WeaponId, PerkId,
   defaultSettings, levelInfo, MapId,
 } from './config';
 import { Game, MatchResult, PlayerInfo, PlayerInput, emptyInput, sameTeam } from './game';
@@ -811,6 +811,11 @@ window.addEventListener('orientationchange', () => setTimeout(onResize, 300));
 // ---------------------------------------------------------------- boot
 
 function boot() {
+  if (IS_TEST) {
+    document.title = 'Kistenkrieg – Testversion';
+    document.body.classList.add('test-build');
+    document.querySelector('meta[name="apple-mobile-web-app-title"]')?.setAttribute('content', 'Kistenkrieg Test');
+  }
   onResize();
   ui.renderMenuProfile(profile);
   const standalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone;

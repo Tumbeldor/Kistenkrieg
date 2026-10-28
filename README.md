@@ -33,6 +33,12 @@ npm run preview   # Build lokal testen
 
 Mehrspieler lokal testen ohne Internet: zwei Tabs mit `?net=local` öffnen (z. B. `http://localhost:5173/?net=local`).
 
+## Testversion (Experimente)
+
+- `main` ist die normale Version: https://tumbeldor.github.io/Kistenkrieg/
+- `experiment` ist die Testversion: https://tumbeldor.github.io/Kistenkrieg/test/ – mit eigenem Spielstand (startet als Kopie des normalen) und eigenen Räumen
+- Der Tag `stabil-v1` markiert den Stand vor den Experimenten; dorthin kann jederzeit zurückgesprungen werden
+
 ## Veröffentlichen
 
 `dist/` ist eine rein statische Seite und läuft auf jedem Static-Host:

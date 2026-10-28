@@ -1,6 +1,6 @@
 // Local profile: progression, loadout, stats and settings (stored in localStorage).
 import {
-  DIFFS, HATS, MatchSettings, PERKS, PerkId, SKINS, WEAPONS, WEAPON_LIST, WeaponId, XP, levelInfo,
+  IS_TEST, DIFFS, HATS, MatchSettings, PERKS, PerkId, SKINS, WEAPONS, WEAPON_LIST, WeaponId, XP, levelInfo,
 } from './config';
 import type { MatchResult } from './game';
 
@@ -19,7 +19,8 @@ export interface Profile {
   host?: MatchSettings;
 }
 
-const KEY = 'kistenkrieg.profile.v1';
+const MAIN_KEY = 'kistenkrieg.profile.v1';
+const KEY = IS_TEST ? 'kistenkrieg.test.profile.v1' : MAIN_KEY;
 
 function fresh(): Profile {
   const n = Math.floor(Math.random() * 900 + 100);
@@ -63,7 +64,8 @@ export function cleanName(s: string): string {
 
 export function loadProfile(): Profile {
   try {
-    const raw = localStorage.getItem(KEY);
+    // the test build starts from a copy of the normal save game but never writes back to it
+    const raw = localStorage.getItem(KEY) ?? (IS_TEST ? localStorage.getItem(MAIN_KEY) : null);
     if (raw) return sanitize(JSON.parse(raw));
   } catch {
     /* storage unavailable */

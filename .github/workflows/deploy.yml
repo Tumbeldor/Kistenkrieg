@@ -1,34 +1,66 @@
 name: Deploy to GitHub Pages
 
+# main       → https://tumbeldor.github.io/Kistenkrieg/
+# experiment → https://tumbeldor.github.io/Kistenkrieg/test/
+# Only main may deploy to Pages, so a push to experiment re-runs this workflow on main,
+# which always builds both branches into one site.
+
 on:
   push:
-    branches: [main]
+    branches: [main, experiment]
   workflow_dispatch:
 
 permissions:
   contents: read
   pages: write
   id-token: write
+  actions: write
 
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  relay:
+    if: github.ref == 'refs/heads/experiment'
+    runs-on: ubuntu-latest
+    steps:
+      - run: gh workflow run deploy.yml --ref main --repo "$GITHUB_REPOSITORY"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
   build:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: main
+          path: main
+      - id: exp
+        uses: actions/checkout@v5
+        continue-on-error: true
+        with:
+          ref: experiment
+          path: experiment
       - uses: actions/setup-node@v5
         with:
           node-version: 20
-          cache: npm
-      - run: npm ci
-      - run: npm run build
+      - name: Build main
+        working-directory: main
+        run: npm ci && npm run build
+      - name: Build experiment into /test/
+        if: steps.exp.outcome == 'success'
+        working-directory: experiment
+        env:
+          VITE_CHANNEL: test
+        run: |
+          npm ci && npm run build
+          cp -r dist ../main/dist/test
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: main/dist
 
   deploy:
     needs: build

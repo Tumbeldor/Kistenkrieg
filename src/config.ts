@@ -1,5 +1,8 @@
 // Static game data: weapons, perks, cosmetics, difficulties, modes, progression.
 
+/** Test build (experiment branch, published under /test/): own save game and own rooms. */
+export const IS_TEST = import.meta.env.VITE_CHANNEL === 'test';
+
 export type WeaponId = 'pistol' | 'smg' | 'shotgun' | 'rifle' | 'sniper' | 'flamer' | 'minigun' | 'rocket' | 'rail';
 export type WeaponKind = 'bullet' | 'rocket' | 'flame' | 'beam';
 

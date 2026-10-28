@@ -1,9 +1,11 @@
 // Networking: host/client over WebRTC (PeerJS, free public signalling + TURN),
 // plus a BroadcastChannel transport (?net=local) for testing several tabs on one machine.
 import Peer, { DataConnection } from 'peerjs';
+import { IS_TEST } from './config';
 
 export const PROTOCOL = 3;
-const PREFIX = 'kistenkrieg-v1-';
+const PREFIX = IS_TEST ? 'kistenkrieg-v1-test-' : 'kistenkrieg-v1-';
+const LOCAL = IS_TEST ? 'kk-test-' : 'kk-';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 export const makeCode = () => Array.from({ length: 4 }, () => ALPHABET[Math.floor(Math.random() * ALPHABET.length)]).join('');
@@ -194,7 +196,7 @@ function joinPeer(code: string): Promise<ClientTransport> {
 
 function hostLocal(): Promise<HostTransport> {
   const code = makeCode();
-  const ch = new BroadcastChannel('kk-' + code);
+  const ch = new BroadcastChannel(LOCAL + code);
   const links = new Map<string, Link>();
   const t = new HostT(code, () => {
     ch.postMessage({ to: '*', m: { t: 'bye' } });
@@ -220,7 +222,7 @@ function hostLocal(): Promise<HostTransport> {
 
 function joinLocal(code: string): Promise<ClientTransport> {
   return new Promise((resolve, reject) => {
-    const ch = new BroadcastChannel('kk-' + code);
+    const ch = new BroadcastChannel(LOCAL + code);
     const me = 'l' + Math.random().toString(36).slice(2, 8);
     const t = new ClientT(() => {
       ch.postMessage({ from: me, to: 'host', m: { t: '__bye' } });
