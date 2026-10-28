@@ -2,6 +2,8 @@
 
 Top-Down-Shooter für den Browser – am PC und auf dem iPhone. Solo gegen Bots oder online mit bis zu 4 Freunden.
 
+**▶ Jetzt spielen: https://tumbeldor.github.io/Kistenkrieg/**
+
 ## Features
 
 - **Modi:** Jeder gegen jeden · Team vs. Bots (Koop) · Überleben mit Bot-Wellen und Boss alle 5 Wellen (Koop)
