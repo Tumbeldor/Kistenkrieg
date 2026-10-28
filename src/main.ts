@@ -116,6 +116,7 @@ document.addEventListener('dblclick', (e) => e.preventDefault());
 const nameInput = $<HTMLInputElement>('name-input');
 nameInput.addEventListener('input', () => {
   profile.name = cleanName(nameInput.value || 'Spieler');
+  profile.named = true;
   saveProfile(profile);
   sendProfileUpdate();
 });
@@ -815,16 +816,60 @@ function boot() {
   const standalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone;
   const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   $('ios-hint').hidden = !ios || !!standalone;
-  const m = location.hash.match(/r=([A-Za-z0-9]{4,6})/);
-  if (m) {
-    const code = normCode(m[1]);
-    $<HTMLInputElement>('join-code').value = code;
-    $('invite-code').textContent = code;
-    $('invite-box').hidden = false;
-    go('online');
-  } else go('menu');
+  const code = inviteCode();
+  if (code) handleInvite(code);
+  else go('menu');
   requestAnimationFrame(frame);
 }
+
+// ---------------------------------------------------------------- invite links (#r=CODE)
+
+const inviteCode = () => {
+  const m = location.hash.match(/r=([A-Za-z0-9]{4,6})/);
+  return m ? normCode(m[1]) : null;
+};
+let pendingInvite = '';
+
+/** Opened via invite link: join right away; first-time players pick a name first. */
+function handleInvite(code: string) {
+  $<HTMLInputElement>('join-code').value = code;
+  $('invite-code').textContent = code;
+  $('invite-box').hidden = false;
+  if (profile.named) {
+    go('online');
+    void joinRoom(code);
+    return;
+  }
+  pendingInvite = code;
+  $('name-code').textContent = code;
+  $('name-err').textContent = '';
+  const inp = $<HTMLInputElement>('name-first');
+  inp.value = '';
+  ui.show('name');
+  setTimeout(() => inp.focus(), 60);
+}
+
+$('name-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const inp = $<HTMLInputElement>('name-first');
+  if (!inp.value.trim()) {
+    $('name-err').textContent = 'Bitte gib einen Namen ein.';
+    inp.focus();
+    return;
+  }
+  profile.name = cleanName(inp.value);
+  profile.named = true;
+  saveProfile(profile);
+  ui.renderMenuProfile(profile);
+  inp.blur();
+  go('online');
+  void joinRoom(pendingInvite);
+});
+
+window.addEventListener('hashchange', () => {
+  const code = inviteCode();
+  if (code && !session) handleInvite(code);
+});
 boot();
 
 // debug hook for automated tests

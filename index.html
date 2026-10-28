@@ -61,6 +61,19 @@
         </div>
       </section>
 
+      <!-- NAME PROMPT (first visit via invite link) -->
+      <section class="screen overlay" id="scr-name">
+        <div class="panel narrow">
+          <h2>Willkommen</h2>
+          <p class="muted">Du wurdest in Raum <b id="name-code"></b> eingeladen. Unter welchem Namen willst du spielen?</p>
+          <form id="name-form" class="col">
+            <input id="name-first" maxlength="14" autocomplete="nickname" autocapitalize="words" spellcheck="false" placeholder="Dein Name" enterkeyhint="go" />
+            <button class="btn primary big" type="submit">Beitreten</button>
+          </form>
+          <p class="status err" id="name-err"></p>
+        </div>
+      </section>
+
       <!-- SOLO SETUP -->
       <section class="screen" id="scr-solo">
         <div class="panel wide">
