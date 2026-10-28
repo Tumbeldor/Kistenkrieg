@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Kistenkrieg" />
+    <meta name="theme-color" content="#0b0f17" />
+    <meta name="description" content="Kistenkrieg – Top-Down-Shooter im Browser. Solo gegen Bots oder online mit Freunden, auf PC und iPhone." />
+    <title>Kistenkrieg</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="icon.svg" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Russo+One&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+    <div id="safe-probe"></div>
+
+    <div id="ui">
+      <!-- MAIN MENU -->
+      <section class="screen" id="scr-menu">
+        <div class="menu-wrap">
+          <div class="brand">
+            <div class="logo-crate" aria-hidden="true"></div>
+            <div>
+              <h1>KISTENKRIEG</h1>
+              <p class="tagline">Top-Down-Shooter · Solo · Koop · Online</p>
+            </div>
+          </div>
+          <div class="menu-grid">
+            <div class="card profile-card">
+              <canvas class="avatar" id="menu-avatar" width="96" height="96"></canvas>
+              <div class="profile-info">
+                <label class="lbl" for="name-input">Dein Name</label>
+                <input id="name-input" maxlength="14" autocomplete="off" spellcheck="false" />
+                <div class="lvl-row"><span class="lvl-badge" id="menu-level">Lv 1</span><span class="xp-text" id="menu-xp">0 / 350 XP</span></div>
+                <div class="xpbar"><div id="menu-xpfill"></div></div>
+                <div class="next-unlock" id="menu-next"></div>
+              </div>
+            </div>
+            <div class="menu-buttons">
+              <button class="btn primary big" data-go="solo">▶ Solo spielen</button>
+              <button class="btn accent big" data-go="online">👥 Mit Freunden</button>
+              <button class="btn" data-go="loadout">🎒 Ausrüstung</button>
+              <button class="btn" data-go="progress">🏅 Fortschritt</button>
+              <button class="btn" data-go="settings">⚙️ Einstellungen</button>
+              <button class="btn" data-go="help">❓ Steuerung</button>
+            </div>
+          </div>
+          <p class="hint" id="ios-hint">📱 iPhone-Tipp: In Safari auf <b>Teilen → Zum Home-Bildschirm</b> tippen – dann läuft das Spiel im Vollbild. Querformat empfohlen.</p>
+        </div>
+      </section>
+
+      <!-- SOLO SETUP -->
+      <section class="screen" id="scr-solo">
+        <div class="panel wide">
+          <header class="panel-head"><button class="back" data-go="menu">←</button><h2>Solo-Match</h2></header>
+          <div id="solo-settings" class="settings-form"></div>
+          <div class="actions"><button class="btn primary big" id="solo-start">▶ Match starten</button></div>
+        </div>
+      </section>
+
+      <!-- ONLINE -->
+      <section class="screen" id="scr-online">
+        <div class="panel">
+          <header class="panel-head"><button class="back" data-go="menu">←</button><h2>Mit Freunden spielen</h2></header>
+          <div class="invite" id="invite-box" hidden>
+            <p>Du wurdest in Raum <b id="invite-code"></b> eingeladen!</p>
+          </div>
+          <div class="online-grid">
+            <div class="card">
+              <h3>Raum erstellen</h3>
+              <p class="muted">Du bist Host. Schick deinen Freunden den Link oder Code (bis zu 4 Spieler).</p>
+              <button class="btn primary" id="btn-host">Raum erstellen</button>
+            </div>
+            <div class="card">
+              <h3>Raum beitreten</h3>
+              <p class="muted">Code vom Host eingeben:</p>
+              <div class="join-row">
+                <input id="join-code" maxlength="6" placeholder="CODE" autocomplete="off" autocapitalize="characters" spellcheck="false" />
+                <button class="btn accent" id="btn-join">Beitreten</button>
+              </div>
+            </div>
+          </div>
+          <p class="status" id="online-status"></p>
+          <p class="hint">Verbindung läuft direkt zwischen euren Geräten (WebRTC). Der Host sollte das Spiel während des Matches im Vordergrund lassen.</p>
+        </div>
+      </section>
+
+      <!-- LOBBY -->
+      <section class="screen" id="scr-lobby">
+        <div class="panel wide">
+          <header class="panel-head"><button class="back" id="lobby-leave">←</button><h2>Lobby</h2></header>
+          <div class="lobby-grid">
+            <div class="lobby-left">
+              <div class="room-code-box">
+                <span class="muted">Raumcode</span>
+                <div class="room-code" id="lobby-code">----</div>
+                <div class="row">
+                  <button class="btn small accent" id="btn-share">🔗 Link teilen</button>
+                  <button class="btn small" id="btn-copy">Code kopieren</button>
+                </div>
+              </div>
+              <h3>Spieler <span class="muted" id="lobby-count"></span></h3>
+              <ul class="members" id="lobby-members"></ul>
+              <button class="btn small" data-go="loadout">🎒 Ausrüstung ändern</button>
+            </div>
+            <div class="lobby-right">
+              <div id="lobby-settings" class="settings-form"></div>
+              <div class="actions">
+                <button class="btn primary big" id="lobby-start">▶ Spiel starten</button>
+                <p class="status" id="lobby-wait">Warte, bis der Host das Spiel startet …</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- LOADOUT -->
+      <section class="screen" id="scr-loadout">
+        <div class="panel wide">
+          <header class="panel-head"><button class="back" id="loadout-back">←</button><h2>Ausrüstung</h2><canvas class="avatar small" id="loadout-avatar" width="64" height="64"></canvas></header>
+          <h3>Hauptwaffe <span class="muted">(Pistole hast du immer dabei)</span></h3>
+          <div class="grid weapons" id="lo-weapons"></div>
+          <h3>Perk</h3>
+          <div class="grid perks" id="lo-perks"></div>
+          <h3>Farbe</h3>
+          <div class="grid swatches" id="lo-skins"></div>
+          <h3>Hut</h3>
+          <div class="grid hats" id="lo-hats"></div>
+        </div>
+      </section>
+
+      <!-- PROGRESS -->
+      <section class="screen" id="scr-progress">
+        <div class="panel wide">
+          <header class="panel-head"><button class="back" data-go="menu">←</button><h2>Fortschritt</h2></header>
+          <div class="progress-top">
+            <div class="lvl-big" id="pr-level">1</div>
+            <div class="grow">
+              <div class="xp-text" id="pr-xp"></div>
+              <div class="xpbar"><div id="pr-xpfill"></div></div>
+            </div>
+          </div>
+          <div class="stats" id="pr-stats"></div>
+          <h3>Freischaltungen</h3>
+          <div class="roadmap" id="pr-roadmap"></div>
+        </div>
+      </section>
+
+      <!-- SETTINGS -->
+      <section class="screen" id="scr-settings">
+        <div class="panel">
+          <header class="panel-head"><button class="back" data-go="menu">←</button><h2>Einstellungen</h2></header>
+          <label class="setting"><span>Lautstärke</span><input type="range" id="set-volume" min="0" max="1" step="0.05" /></label>
+          <label class="setting"><span>Zielhilfe (Touch)</span><input type="checkbox" id="set-assist" /></label>
+          <label class="setting"><span>FPS anzeigen</span><input type="checkbox" id="set-fps" /></label>
+          <h3>Spielstand</h3>
+          <p class="muted">Dein Fortschritt wird nur auf diesem Gerät gespeichert. Mit dem Code kannst du ihn auf ein anderes Gerät (oder vom Safari-Tab in die Home-Bildschirm-App) übertragen.</p>
+          <div class="row wrap">
+            <button class="btn small" id="btn-export">Code kopieren</button>
+            <button class="btn small" id="btn-import">Code einfügen</button>
+            <button class="btn small danger" id="btn-reset">Fortschritt löschen</button>
+          </div>
+          <textarea id="save-code" rows="3" placeholder="Spielstand-Code" spellcheck="false"></textarea>
+          <p class="status" id="settings-status"></p>
+        </div>
+      </section>
+
+      <!-- HELP -->
+      <section class="screen" id="scr-help">
+        <div class="panel">
+          <header class="panel-head"><button class="back" id="help-back">←</button><h2>Steuerung</h2></header>
+          <div class="help-grid">
+            <div class="card">
+              <h3>🖥️ PC</h3>
+              <table class="keys">
+                <tr><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></td><td>Laufen</td></tr>
+                <tr><td>Maus</td><td>Zielen</td></tr>
+                <tr><td>Linksklick</td><td>Schießen (gedrückt halten)</td></tr>
+                <tr><td><kbd>R</kbd></td><td>Nachladen</td></tr>
+                <tr><td><kbd>Q</kbd> / Mausrad / <kbd>1</kbd>-<kbd>3</kbd></td><td>Waffe wechseln</td></tr>
+                <tr><td><kbd>Tab</kbd></td><td>Punktetabelle</td></tr>
+                <tr><td><kbd>Esc</kbd></td><td>Pause / Menü</td></tr>
+              </table>
+            </div>
+            <div class="card">
+              <h3>📱 iPhone</h3>
+              <table class="keys">
+                <tr><td>Linker Daumen</td><td>Laufen (überall auf der linken Hälfte)</td></tr>
+                <tr><td>Rechter Daumen</td><td>Zielen – weit ziehen = feuern</td></tr>
+                <tr><td>Rechts kurz tippen</td><td>Schnellschuss auf nächsten Gegner</td></tr>
+                <tr><td>↻ / Waffen-Knopf</td><td>Nachladen / Wechseln</td></tr>
+              </table>
+            </div>
+          </div>
+          <div class="card tips">
+            <h3>Tipps</h3>
+            <ul>
+              <li>🌳 In <b>Büschen</b> bist du für Gegner unsichtbar – bis du schießt oder sie ganz nah sind.</li>
+              <li>📦 <b>Holzkisten</b> blocken Kugeln, gehen aber kaputt. Metallkisten halten alles aus.</li>
+              <li>🛢️ Rote <b>Fässer</b> explodieren – lock Gegner daneben!</li>
+              <li>✚ Medikits, 🛡️ Rüstung und ⭐ Spezialwaffen liegen auf leuchtenden Plätzen.</li>
+              <li>🏅 Jede Eliminierung bringt XP. Mit neuen Leveln schaltest du Waffen, Perks, Farben und Hüte frei.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- PAUSE -->
+      <section class="screen overlay" id="scr-pause">
+        <div class="panel narrow">
+          <h2>Pause</h2>
+          <p class="muted" id="pause-note"></p>
+          <div class="col">
+            <button class="btn primary" id="pause-resume">Weiter</button>
+            <button class="btn" id="pause-loadout">🎒 Ausrüstung (ab nächstem Respawn)</button>
+            <button class="btn" id="pause-help">❓ Steuerung</button>
+            <button class="btn danger" id="pause-quit">Match verlassen</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- RESULTS -->
+      <section class="screen" id="scr-results">
+        <div class="panel wide">
+          <h2 class="result-title" id="res-title">Match vorbei</h2>
+          <p class="muted center" id="res-sub"></p>
+          <div class="results-grid">
+            <div>
+              <table class="score-table" id="res-table"></table>
+            </div>
+            <div class="card">
+              <h3>Erfahrung</h3>
+              <ul class="xp-lines" id="res-xp"></ul>
+              <div class="lvl-row"><span class="lvl-badge" id="res-level">Lv 1</span><span class="xp-text" id="res-xptext"></span></div>
+              <div class="xpbar"><div id="res-xpfill"></div></div>
+              <div class="unlock-banner" id="res-unlocks" hidden></div>
+            </div>
+          </div>
+          <div class="actions row center">
+            <button class="btn primary" id="res-again">Nochmal</button>
+            <button class="btn" id="res-lobby">Zur Lobby</button>
+            <button class="btn" id="res-menu">Hauptmenü</button>
+          </div>
+          <p class="status center" id="res-wait"></p>
+        </div>
+      </section>
+
+      <div id="toast" hidden></div>
+      <div id="busy" hidden><div class="spinner"></div><p id="busy-text">Verbinde …</p></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
