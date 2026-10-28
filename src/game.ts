@@ -417,6 +417,7 @@ export class Game {
       angles.push(Math.round((p.aim + base + jitter) * 1000) / 1000);
     }
     p.lastShotAt = this.time;
+    if (this.authority) this.alertBots(p, mz.x, mz.y, w);
     const b = p.id + '.' + ++this.seq;
     const x = Math.round(mz.x), y = Math.round(mz.y);
     if (def.kind === 'beam') {
@@ -435,6 +436,7 @@ export class Game {
     if (!p || !p.alive || !WEAPONS[s.w] || !Array.isArray(s.a)) return;
     const def = WEAPONS[s.w];
     p.lastShotAt = this.time;
+    this.alertBots(p, s.x, s.y, s.w);
     const angles = s.a.slice(0, def.pellets);
     if (def.kind === 'beam') {
       const end = this.beam(p, s.x, s.y, angles[0], false);
@@ -442,6 +444,16 @@ export class Game {
     } else {
       this.spawnBullets(p, s.w, s.x, s.y, angles, String(s.b), false);
       this.emit({ e: 'shot', p: pid, w: s.w, x: s.x, y: s.y, a: angles, b: String(s.b) });
+    }
+  }
+
+  /** Gunfire is audible: nearby enemy bots investigate the area. */
+  private alertBots(shooter: Player, x: number, y: number, w: WeaponId) {
+    const def = WEAPONS[w];
+    const range = def.kind === 'flame' ? 450 : w === 'sniper' || w === 'rocket' || w === 'rail' ? 1400 : 1000;
+    for (const b of this.list) {
+      if (!b.brain || !b.alive || b === shooter || sameTeam(b, shooter)) continue;
+      if (dist2(b.x, b.y, x, y) < range * range) b.brain.onNoise(x, y);
     }
   }
 

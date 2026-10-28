@@ -45,9 +45,16 @@ export class Bot {
     this.stuckN = 0;
   }
 
+  /** A gunshot was heard: investigate roughly where it came from. */
+  onNoise(x: number, y: number) {
+    if (this.targetVisible) return;
+    this.lastKnown = { x: x + rand(-140, 140), y: y + rand(-140, 140) };
+    this.lastKnownT = performance.now() / 1000;
+  }
+
   onHurt(attacker: Player) {
     if (!this.targetVisible) {
-      this.lastKnown = { x: attacker.x, y: attacker.y };
+      this.lastKnown = { x: attacker.x + rand(-80, 80), y: attacker.y + rand(-80, 80) };
       this.lastKnownT = performance.now() / 1000;
     }
   }
@@ -185,8 +192,11 @@ export class Bot {
     let bestScore = Infinity;
     for (const e of g.list) {
       if (e === me || !e.alive || sameTeam(e, me)) continue;
-      const dd = dist(me.x, me.y, e.x, e.y);
-      if (dd > this.diff.sight) continue;
+      // only spot what a player would see on screen: a wide, flat box around the bot
+      const keep = e === this.target && this.targetVisible ? 1.15 : 1;
+      const ax = Math.abs(e.x - me.x), ay = Math.abs(e.y - me.y);
+      if (ax > this.diff.sight * keep || ay > this.diff.sight * 0.5 * keep) continue;
+      const dd = Math.hypot(ax, ay);
       if (!g.visibleTo(me, e)) continue;
       if (!g.map.los(me.x, me.y, e.x, e.y)) continue;
       let score = dd;
@@ -232,7 +242,10 @@ export class Bot {
       const ak = this.nearestPickup(g, me, 'armor');
       if (ak && dist(me.x, me.y, ak.x, ak.y) < 800) { this.goal = { x: ak.x, y: ak.y }; return; }
     }
-    const huntChance = g.settings.mode === 'survival' ? 1 : d.hunt;
+    // no wallhack: head only roughly towards the nearest enemy
+    const survival = g.settings.mode === 'survival';
+    const huntChance = survival ? 1 : d.hunt * 0.5;
+    const off = survival ? 250 : 500;
     if (Math.random() < huntChance) {
       let best: Player | null = null;
       let bd = Infinity;
@@ -242,7 +255,10 @@ export class Bot {
         if (dd < bd) { bd = dd; best = e; }
       }
       if (best) {
-        this.goal = { x: best.x + rand(-150, 150), y: best.y + rand(-150, 150) };
+        this.goal = {
+          x: Math.max(60, Math.min(g.map.w - 60, best.x + rand(-off, off))),
+          y: Math.max(60, Math.min(g.map.h - 60, best.y + rand(-off, off))),
+        };
         this.goalT = rand(1.5, 3);
         return;
       }
