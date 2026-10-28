@@ -802,7 +802,7 @@ function releaseWakeLock() {
 
 function onResize() {
   renderer.resize();
-  input.layout(renderer.W, renderer.H, renderer.safe.l, renderer.safe.r);
+  input.layout(renderer.W, renderer.H, renderer.safe.l, renderer.safe.r, renderer.safe.b);
   if (session?.game) renderer.setMap(session.game.map);
 }
 window.addEventListener('resize', onResize);
@@ -873,4 +873,4 @@ window.addEventListener('hashchange', () => {
 boot();
 
 // debug hook for automated tests
-(window as unknown as { __kk: unknown }).__kk = { get session() { return session; }, get profile() { return profile; }, input, renderer };
+(window as unknown as { __kk: unknown }).__kk = { get session() { return session; }, get profile() { return profile; }, input, renderer, audio };

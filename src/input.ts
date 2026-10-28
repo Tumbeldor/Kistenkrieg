@@ -73,18 +73,23 @@ export class Input {
     canvas.addEventListener('touchcancel', (e) => this.onTouchEnd(e), opts);
   }
 
-  layout(W: number, H: number, safeL: number, safeR: number) {
+  layout(W: number, H: number, safeL: number, safeR: number, safeB = 0) {
     this.W = W;
     const small = Math.min(W, H) < 500;
     const br = small ? 27 : 32;
     this.stickR = small ? 56 : 66;
     const rx = W - safeR - br - 14;
+    // reload / swap sit in the lower right, clear of the pause button, but above the bottom edge
+    const gap = 14;
+    const maxY = H - safeB - 22 - br; // lowest allowed centre of the swap button
+    const swapY = Math.min(maxY, H * 0.62);
+    const reloadY = swapY - br * 2 - gap;
     const prev = new Map(this.buttons.map((b) => [b.id, b.touch]));
     this.buttons = [
       { id: 'pause', x: W - safeR - 30, y: 30, r: 22, touch: null },
       { id: 'score', x: W - safeR - 84, y: 30, r: 22, touch: null },
-      { id: 'reload', x: rx, y: H * 0.36, r: br, touch: null },
-      { id: 'swap', x: rx, y: H * 0.36 + br * 2 + 14, r: br, touch: null },
+      { id: 'reload', x: rx, y: reloadY, r: br, touch: null },
+      { id: 'swap', x: rx, y: swapY, r: br, touch: null },
     ];
     for (const b of this.buttons) b.touch = prev.get(b.id) ?? null;
     void safeL;

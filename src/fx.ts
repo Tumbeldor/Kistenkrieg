@@ -42,12 +42,13 @@ export class Fx {
     this.myKills = 0;
   }
 
-  private spatial(x: number, y: number): [number, number] {
+  /** Volume, stereo pan and distance (0 near .. 1 far) of a world position relative to the listener. */
+  private spatial(x: number, y: number): [number, number, number] {
     const dx = x - this.listener.x;
     const dy = y - this.listener.y;
     const d = Math.hypot(dx, dy);
     const v = Math.max(0, 1 - d / 1500);
-    return [v * v, dx / 900];
+    return [v * v, dx / 900, Math.min(1, d / 1500)];
   }
 
   add(p: Partial<Particle> & Pick<Particle, 'x' | 'y' | 'kind' | 'color'>) {
@@ -97,8 +98,8 @@ export class Fx {
     switch (ev.e) {
       case 'shot': {
         const def = WEAPONS[ev.w];
-        const [v, pan] = this.spatial(ev.x, ev.y);
-        sfx.sfxShot(ev.w, Math.min(1, v * (ev.p === local ? 1 : 0.85)), pan);
+        const [v, pan, far] = this.spatial(ev.x, ev.y);
+        sfx.sfxShot(ev.w, Math.min(1, v * (ev.p === local ? 1 : 0.85)), pan, far);
         if (def.kind !== 'flame') {
           this.flashes.push({ x: ev.x, y: ev.y, a: ev.a[0], life: 0.06, size: def.pellets > 1 ? 1.5 : def.id === 'sniper' ? 1.6 : 1 });
           if (def.kind === 'bullet') {
@@ -114,8 +115,8 @@ export class Fx {
       }
       case 'beam': {
         this.beams.push({ x: ev.x, y: ev.y, x2: ev.x2, y2: ev.y2, life: 0.3 });
-        const [v, pan] = this.spatial(ev.x, ev.y);
-        sfx.sfxShot('rail', v, pan);
+        const [v, pan, far] = this.spatial(ev.x, ev.y);
+        sfx.sfxShot('rail', v, pan, far);
         for (let i = 0; i < 10; i++) this.add({ x: ev.x2, y: ev.y2, vx: rand(-200, 200), vy: rand(-200, 200), kind: 'spark', color: '#a6dbe4', life: 0.35, size: 2 });
         if (ev.p === local) this.shake = Math.min(14, this.shake + 4);
         break;
@@ -162,7 +163,7 @@ export class Fx {
         const s = g.map.solids[ev.id];
         if (!s) break;
         const cx = s.x + s.w / 2, cy = s.y + s.h / 2;
-        const [v, pan] = this.spatial(cx, cy);
+        const [v, pan, far] = this.spatial(cx, cy);
         const wood = s.kind === 'crate';
         if (ev.hp <= 0) {
           for (let i = 0; i < 18; i++) {
@@ -170,7 +171,7 @@ export class Fx {
               color: wood ? (Math.random() < 0.5 ? '#a8743f' : '#7a4f22') : '#c33', life: rand(0.5, 1.1), size: rand(4, 9), vr: rand(-12, 12), drag: 4 });
           }
           for (let i = 0; i < 5; i++) this.add({ x: cx, y: cy, vx: rand(-40, 40), vy: rand(-40, 40), kind: 'smoke', color: '#9a8a76', life: rand(0.6, 1.1), size: 16, grow: 20, drag: 2 });
-          sfx.sfxCrate(v, pan);
+          sfx.sfxCrate(v, pan, far);
         } else if (Math.random() < 0.5) {
           this.add({ x: cx + rand(-s.w / 2, s.w / 2), y: cy + rand(-s.h / 2, s.h / 2), vx: rand(-120, 120), vy: rand(-120, 120), kind: 'chip', color: '#c8955a', life: 0.4, size: 3, drag: 5 });
         }
@@ -178,8 +179,8 @@ export class Fx {
       }
       case 'boom': {
         this.explosion(ev.x, ev.y, ev.r);
-        const [v, pan] = this.spatial(ev.x, ev.y);
-        sfx.sfxBoom(Math.min(1, v * 1.2), pan);
+        const [v, pan, far] = this.spatial(ev.x, ev.y);
+        sfx.sfxBoom(Math.min(1, v * 1.2), pan, far);
         this.shake = Math.min(22, this.shake + 16 * v);
         break;
       }
@@ -231,7 +232,11 @@ export class Fx {
         if (ev.p === local) sfx.sfxEmpty();
         break;
       case 'reload':
-        if (ev.p === local) sfx.sfxReload();
+        if (ev.p === local) {
+          const p = g.players.get(ev.p);
+          const slot = p?.slots[p.cur];
+          if (p && slot) sfx.sfxReload(slot.id, slot.reloadTotal || WEAPONS[slot.id].reload);
+        }
         break;
       case 'end':
         this.onEnd?.(ev);
