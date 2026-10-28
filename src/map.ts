@@ -25,6 +25,10 @@ export interface RayHit { t: number; solid: Solid | null }
 
 const CELL = 128;
 const NAV = 40;
+/** Map dimensions per size: 0 = small (2–3 players), 1 = medium, 2 = large (7+ players). */
+export const MAP_SIZES: [number, number][] = [[1700, 1200], [2300, 1600], [2800, 1900]];
+export type MapSize = 0 | 1 | 2;
+export const mapSizeFor = (players: number): MapSize => (players <= 3 ? 0 : players <= 6 ? 1 : 2);
 
 export class GameMap {
   readonly w: number;
@@ -42,10 +46,9 @@ export class GameMap {
   private buf: Solid[] = [];
   readonly nav: NavGrid;
 
-  constructor(seed: number, theme: MapId, large: boolean) {
+  constructor(seed: number, theme: MapId, size: MapSize) {
     this.theme = theme;
-    this.w = large ? 2800 : 2300;
-    this.h = large ? 1900 : 1600;
+    [this.w, this.h] = MAP_SIZES[size] ?? MAP_SIZES[1];
     this.cols = Math.ceil(this.w / CELL);
     this.rows = Math.ceil(this.h / CELL);
     this.buckets = Array.from({ length: this.cols * this.rows }, () => []);
@@ -230,10 +233,13 @@ function generate(m: GameMap, rng: Rng): void {
   wall(W - T, T, T, H - 2 * T);
 
   const theme = m.theme;
+  // fewer objects on maps smaller than the medium size
+  const k = Math.min(1, (W * H) / (MAP_SIZES[1][0] * MAP_SIZES[1][1]));
+  const n = (v: number) => Math.round(v * k);
   const wallRects: Rect[] = [];
   const blockers: Rect[] = []; // everything solid placed so far (for spacing)
   const wt = 28;
-  const nStruct = theme === 'lager' ? 11 : theme === 'wueste' ? 8 : 4;
+  const nStruct = n(theme === 'lager' ? 11 : theme === 'wueste' ? 8 : 4);
   for (let attempt = 0, placed = 0; attempt < 200 && placed < nStruct; attempt++) {
     const cx = rng.range(260, W - 260);
     const cy = rng.range(260, H - 260);
@@ -293,7 +299,7 @@ function generate(m: GameMap, rng: Rng): void {
   }
 
   // Round solids: trees / rocks / cacti
-  const nRocks = theme === 'wald' ? 26 : theme === 'wueste' ? 10 : 0;
+  const nRocks = n(theme === 'wald' ? 26 : theme === 'wueste' ? 10 : 0);
   for (let i = 0, a = 0; i < nRocks && a < 400; a++) {
     const r = theme === 'wald' ? rng.range(24, 40) : rng.range(20, 32);
     const x = rng.range(T + 90, W - T - 90);
@@ -311,7 +317,7 @@ function generate(m: GameMap, rng: Rng): void {
     [[0, 0]], [[0, 0], [1, 0]], [[0, 0], [0, 1]], [[0, 0], [1, 0], [0, 1], [1, 1]], [[0, 0], [1, 0], [2, 0]],
     [[0, 0], [1, 0], [0, 1]], [[0, 0], [1, 0], [2, 0], [1, 1]], [[0, 0], [1, 1]],
   ];
-  const nClusters = theme === 'lager' ? 22 : theme === 'wueste' ? 14 : 11;
+  const nClusters = n(theme === 'lager' ? 22 : theme === 'wueste' ? 14 : 11);
   for (let i = 0, a = 0; i < nClusters && a < 500; a++) {
     const pat = rng.pick(patterns);
     const ox = rng.range(T + 80, W - T - 200);
@@ -332,7 +338,7 @@ function generate(m: GameMap, rng: Rng): void {
   }
 
   // Explosive barrels
-  const nBarrels = theme === 'wueste' ? 9 : theme === 'lager' ? 7 : 4;
+  const nBarrels = n(theme === 'wueste' ? 9 : theme === 'lager' ? 7 : 4);
   for (let i = 0, a = 0; i < nBarrels && a < 300; a++) {
     const s = 38;
     const box = { x: rng.range(T + 80, W - T - 120), y: rng.range(T + 80, H - T - 120), w: s, h: s };
@@ -343,7 +349,7 @@ function generate(m: GameMap, rng: Rng): void {
   }
 
   // Bushes (hiding spots, not solid)
-  const nBush = theme === 'wald' ? 24 : theme === 'wueste' ? 10 : 9;
+  const nBush = n(theme === 'wald' ? 24 : theme === 'wueste' ? 10 : 9);
   for (let i = 0, a = 0; i < nBush && a < 400; a++) {
     const r = rng.range(50, 78);
     const x = rng.range(T + r, W - T - r);

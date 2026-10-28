@@ -116,7 +116,8 @@ export function computeXp(res: MatchResult, myId: string, settings: MatchSetting
     won = res.wave >= 5;
   }
   let total = lines.reduce((s, l) => s + l.xp, 0);
-  const dm = DIFFS[settings.diff].xp;
+  const withBots = res.mode !== 'dm' || res.rows.some((r) => r.bot);
+  const dm = withBots ? DIFFS[settings.diff].xp : 1;
   if (dm !== 1) {
     const extra = Math.round(total * (dm - 1));
     lines.push({ label: `Schwierigkeit ${DIFFS[settings.diff].name} ×${dm}`, xp: extra });

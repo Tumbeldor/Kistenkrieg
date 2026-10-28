@@ -5,7 +5,7 @@ import {
   BASE_HP, BASE_SPEED, DIFFS, MAX_TOTAL, MatchSettings, MapId, PERKS, PICKUP_WEAPONS, PLAYER_RADIUS, PerkId,
   RESPAWN_TIME, SPAWN_PROTECT, WEAPONS, WEAPON_LIST, WeaponId, BOT_NAMES,
 } from './config';
-import { GameMap, PickupKind, Solid } from './map';
+import { GameMap, MapSize, PickupKind, Solid } from './map';
 import { Vec, angleDiff, dist, dist2, lerp, lerpAngle, segCircle } from './geom';
 import { WeaponSlot, loadout, magSize, makeSlot, tickWeapon } from './weapons';
 import { Bot } from './bot';
@@ -122,7 +122,7 @@ export interface GameOptions {
   settings: MatchSettings;
   seed: number;
   mapId: MapId;
-  large: boolean;
+  size: MapSize;
   localId: string;
 }
 
@@ -137,7 +137,7 @@ export class Game {
   readonly map: GameMap;
   readonly seed: number;
   readonly mapId: MapId;
-  readonly large: boolean;
+  readonly size: MapSize;
   localId: string;
   time = 0;
   players = new Map<string, Player>();
@@ -165,9 +165,9 @@ export class Game {
     this.settings = o.settings;
     this.seed = o.seed;
     this.mapId = o.mapId;
-    this.large = o.large;
+    this.size = o.size;
     this.localId = o.localId;
-    this.map = new GameMap(o.seed, o.mapId, o.large);
+    this.map = new GameMap(o.seed, o.mapId, o.size);
     this.timeLeft = o.settings.mode === 'survival' ? 0 : o.settings.timeLimit;
     this.pickups = this.map.pickupSpots.map((s, i) => ({
       i, x: s.x, y: s.y, kind: s.kind, w: s.kind === 'weapon' ? pick(PICKUP_WEAPONS) : null, on: true, t: 0,

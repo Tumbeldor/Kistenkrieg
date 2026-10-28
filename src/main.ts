@@ -5,6 +5,7 @@ import {
 } from './config';
 import { Game, MatchResult, PlayerInfo, PlayerInput, emptyInput, sameTeam } from './game';
 import { Renderer } from './render';
+import { mapSizeFor } from './map';
 import { Input } from './input';
 import { Fx } from './fx';
 import { angleDiff, dist } from './geom';
@@ -247,16 +248,23 @@ function startLocalMatch() {
   if (!session) return;
   const s = { ...session.settings };
   const humans = session.members.length;
-  if (s.mode === 'dm') s.bots = Math.max(humans > 1 ? 0 : 1, Math.min(s.bots, MAX_TOTAL - humans));
+  const online = session.kind === 'host';
+  if (s.mode === 'dm' && s.bots === 0 && humans < 2) {
+    ui.toast('Ohne Bots braucht ihr mindestens 2 Spieler.', 3500);
+    showLobby();
+    return;
+  }
+  // online free-for-all may be friends only (0 bots); solo needs at least one bot
+  if (s.mode === 'dm') s.bots = Math.max(online ? 0 : 1, Math.min(s.bots, MAX_TOTAL - humans));
   if (s.mode === 'team') {
     s.bots = Math.max(1, Math.min(s.bots, MAX_TOTAL - humans));
     s.allies = Math.max(0, Math.min(s.allies, MAX_TOTAL - humans - s.bots));
   }
   const mapId: MapId = s.map === 'random' ? pick(MAP_LIST) : s.map;
   const total = humans + (s.mode === 'dm' ? s.bots : s.mode === 'team' ? s.bots + s.allies : 6);
-  const large = total > 6;
+  const size = s.mapSize === 'small' ? 0 : s.mapSize === 'medium' ? 1 : s.mapSize === 'large' ? 2 : mapSizeFor(total);
   const seed = (Math.random() * 2 ** 31) | 0;
-  const g = new Game({ authority: true, settings: s, seed, mapId, large, localId: session.myId });
+  const g = new Game({ authority: true, settings: s, seed, mapId, size, localId: session.myId });
   const team = s.mode === 'dm' ? -1 : 0;
   for (const m of session.members) g.addPlayer(infoOf(m, team), true);
   g.populateBots();
@@ -264,7 +272,7 @@ function startLocalMatch() {
   session.game = g;
   session.ended = false;
   if (session.kind === 'host') {
-    for (const [id, link] of session.links) link.send({ t: 'start', seed, mapId, large, settings: s, you: id, full: g.fullState() });
+    for (const [id, link] of session.links) link.send({ t: 'start', seed, mapId, size, settings: s, you: id, full: g.fullState() });
     broadcastLobby();
   }
   enterMatch(g);
@@ -400,7 +408,7 @@ function hostOnMessage(l: Link, m: Msg) {
       if (g && !g.over) {
         // late join into the running match
         g.addPlayer(infoOf(mem, g.settings.mode === 'dm' ? -1 : 0), true);
-        l.send({ t: 'start', seed: g.seed, mapId: g.mapId, large: g.large, settings: g.settings, you: l.id, full: g.fullState() });
+        l.send({ t: 'start', seed: g.seed, mapId: g.mapId, size: g.size, settings: g.settings, you: l.id, full: g.fullState() });
       }
       broadcastLobby();
       if (!g) ui.toast(`${mem.name} ist beigetreten`);
@@ -436,9 +444,15 @@ function hostOnLeave(l: Link) {
   s.links.delete(l.id);
   const mem = s.members.find((x) => x.id === l.id);
   s.members = s.members.filter((x) => x.id !== l.id);
-  s.game?.removePlayer(l.id);
+  const g = s.game;
+  g?.removePlayer(l.id);
+  // a friends-only free-for-all cannot go on alone
+  if (g && !g.over && g.settings.mode === 'dm' && !g.list.some((p) => p.bot) && g.list.length < 2) {
+    g.emit({ e: 'msg', text: 'Alle Mitspieler sind weg' });
+    g.finish();
+  }
   broadcastLobby();
-  if (mem && !s.game) ui.toast(`${mem.name} hat den Raum verlassen`);
+  if (mem && !g) ui.toast(`${mem.name} hat den Raum verlassen`);
 }
 
 function broadcastLobby() {
@@ -466,9 +480,12 @@ function renderLobbyScreen() {
     saveProfile(profile);
     broadcastLobby();
     renderLobbyScreen();
-  });
+  }, true);
   const startBtn = $<HTMLButtonElement>('lobby-start');
-  startBtn.textContent = s.members.length > 1 ? `▶ Spiel starten (${s.members.length} Spieler)` : '▶ Spiel starten (allein)';
+  const needFriends = s.settings.mode === 'dm' && s.settings.bots === 0 && s.members.length < 2;
+  startBtn.disabled = needFriends;
+  startBtn.textContent = needFriends ? 'Warte auf Mitspieler …'
+    : s.members.length > 1 ? `▶ Spiel starten (${s.members.length} Spieler)` : '▶ Spiel starten (allein)';
 }
 
 $('lobby-start').onclick = () => {
@@ -558,7 +575,7 @@ function clientOnMessage(m: Msg, onWelcome: () => void) {
       if (ui.currentScreen() === 'lobby') renderLobbyScreen();
       break;
     case 'start': {
-      const g = new Game({ authority: false, settings: m.settings, seed: m.seed, mapId: m.mapId, large: m.large, localId: m.you });
+      const g = new Game({ authority: false, settings: m.settings, seed: m.seed, mapId: m.mapId, size: m.size, localId: m.you });
       g.applyFullState(m.full);
       const me = g.local;
       if (me) { me.primary = profile.primary; me.perk = profile.perk; }
@@ -697,7 +714,7 @@ function step(dt: number, draw: boolean) {
 function startDemo() {
   const mapId = pick(MAP_LIST);
   const s: MatchSettings = { ...defaultSettings('dm'), bots: 7, diff: 'normal', killLimit: 9999, timeLimit: 9999, map: mapId };
-  demo = new Game({ authority: true, settings: s, seed: (Math.random() * 1e9) | 0, mapId, large: false, localId: '-' });
+  demo = new Game({ authority: true, settings: s, seed: (Math.random() * 1e9) | 0, mapId, size: 1, localId: '-' });
   demo.populateBots();
   demoFx.reset();
   demoFollow = null;

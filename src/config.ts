@@ -151,9 +151,15 @@ export const MAPS: Record<MapId, { id: MapId; name: string }> = {
 };
 export const MAP_LIST: MapId[] = ['lager', 'wald', 'wueste'];
 
+export type MapSizeId = 'auto' | 'small' | 'medium' | 'large';
+export const MAP_SIZE_LIST: { id: MapSizeId; name: string }[] = [
+  { id: 'auto', name: 'Automatisch' }, { id: 'small', name: 'Klein' }, { id: 'medium', name: 'Mittel' }, { id: 'large', name: 'Groß' },
+];
+
 export interface MatchSettings {
   mode: ModeId;
   map: MapId | 'random';
+  mapSize: MapSizeId; // auto = by player count
   diff: DiffId;
   bots: number; // enemy bots (dm: all bots)
   allies: number; // team mode: bots on the human team
@@ -162,7 +168,7 @@ export interface MatchSettings {
 }
 
 export const defaultSettings = (mode: ModeId = 'dm'): MatchSettings => ({
-  mode, map: 'random', diff: 'normal',
+  mode, map: 'random', mapSize: 'auto', diff: 'normal',
   bots: mode === 'team' ? 5 : 4,
   allies: mode === 'team' ? 1 : 0,
   killLimit: mode === 'team' ? 30 : 15,

@@ -1,6 +1,6 @@
 // DOM menus: screens, settings forms, loadout, progress, lobby and results.
 import {
-  DIFFS, DIFF_LIST, HATS, MAP_LIST, MAPS, MAX_HUMANS, MAX_TOTAL, MODES, MODE_LIST, MatchSettings, PERKS, SKINS,
+  DIFFS, DIFF_LIST, HATS, MAP_LIST, MAP_SIZE_LIST, MAPS, MapSizeId, MAX_HUMANS, MAX_TOTAL, MODES, MODE_LIST, MatchSettings, PERKS, SKINS,
   TEAM_NAMES, WEAPONS, WEAPON_LIST, WeaponId, allUnlocks, defaultSettings, levelInfo, xpToNext, MAX_LEVEL,
 } from './config';
 import type { MatchResult } from './game';
@@ -39,8 +39,10 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 
 // ---------------------------------------------------------------- settings form
 
-export function renderSettingsForm(root: HTMLElement, s: MatchSettings, editable: boolean, humans: number, onChange: (s: MatchSettings) => void) {
+/** online=true: friends lobby – "Jeder gegen jeden" can be played with or without bots. */
+export function renderSettingsForm(root: HTMLElement, s: MatchSettings, editable: boolean, humans: number, onChange: (s: MatchSettings) => void, online = false) {
   root.innerHTML = '';
+  const noBots = s.mode === 'dm' && s.bots === 0;
   const set = (patch: Partial<MatchSettings>) => onChange({ ...s, ...patch });
 
   const modeField = el('div', 'field');
@@ -48,12 +50,13 @@ export function renderSettingsForm(root: HTMLElement, s: MatchSettings, editable
   const cards = el('div', 'mode-cards');
   for (const id of MODE_LIST) {
     const m = MODES[id];
-    const b = el('button', 'mode-card' + (s.mode === id ? ' on' : ''), `<b>${m.name}</b><span>${m.desc}</span>`);
+    const desc = online && id === 'dm' ? 'Freie Schlacht – nur unter Freunden oder zusammen mit Bots.' : m.desc;
+    const b = el('button', 'mode-card' + (s.mode === id ? ' on' : ''), `<b>${m.name}</b><span>${desc}</span>`);
     b.disabled = !editable;
     b.onclick = () => {
       if (s.mode === id) return;
       const d = defaultSettings(id);
-      onChange({ ...d, map: s.map, diff: s.diff });
+      onChange({ ...d, map: s.map, mapSize: s.mapSize ?? 'auto', diff: s.diff });
     };
     cards.append(b);
   }
@@ -92,10 +95,16 @@ export function renderSettingsForm(root: HTMLElement, s: MatchSettings, editable
   const two = el('div', 'two-col');
   root.append(two);
   seg('Karte', [{ v: 'random', t: '🎲 Zufall' }, ...MAP_LIST.map((m) => ({ v: m, t: MAPS[m].name }))], s.map as string, (v) => set({ map: v as MatchSettings['map'] }), two);
-  seg('Schwierigkeit (Bots)', DIFF_LIST.map((d) => ({ v: d, t: DIFFS[d].name })), s.diff as string, (v) => set({ diff: v as MatchSettings['diff'] }), two);
+  seg('Kartengröße', MAP_SIZE_LIST.map((z) => ({ v: z.id, t: z.name })), (s.mapSize ?? 'auto') as string, (v) => set({ mapSize: v as MapSizeId }), two);
   const room = Math.max(0, MAX_TOTAL - Math.max(humans, 1));
+  if (online && s.mode === 'dm') {
+    seg('Gegner', [{ v: 0, t: '👥 Nur Freunde' }, { v: 1, t: '🤖 Mit Bots' }], noBots ? 0 : 1,
+      (v) => set({ bots: v === 0 ? 0 : Math.max(1, Math.min(4, room)) }), two);
+  }
+  if (!noBots) seg('Schwierigkeit (Bots)', DIFF_LIST.map((d) => ({ v: d, t: DIFFS[d].name })), s.diff as string, (v) => set({ diff: v as MatchSettings['diff'] }), two);
   if (s.mode === 'dm') {
-    stepper('Bots', s.bots, humans > 1 ? 0 : 1, Math.min(9, room), (v) => set({ bots: v }), two);
+    if (noBots) two.append(el('p', 'muted', humans < 2 ? 'Nur ihr, ohne Bots. Es fehlen noch Mitspieler (mindestens 2).' : `Nur ihr ${humans}, ohne Bots.`));
+    else stepper('Bots', s.bots, 1, Math.min(9, room), (v) => set({ bots: v }), two);
     seg('Kill-Limit', [10, 15, 20, 30].map((v) => ({ v, t: String(v) })), s.killLimit, (v) => set({ killLimit: v }), two);
     seg('Zeitlimit', [180, 300, 480, 600].map((v) => ({ v, t: v / 60 + ' min' })), s.timeLimit, (v) => set({ timeLimit: v }), two);
   } else if (s.mode === 'team') {

@@ -2,7 +2,7 @@
 // plus a BroadcastChannel transport (?net=local) for testing several tabs on one machine.
 import Peer, { DataConnection } from 'peerjs';
 
-export const PROTOCOL = 1;
+export const PROTOCOL = 2;
 const PREFIX = 'kistenkrieg-v1-';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
