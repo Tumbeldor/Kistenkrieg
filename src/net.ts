@@ -57,6 +57,29 @@ class ClientT implements ClientTransport {
   }
 }
 
+/**
+ * ICE servers for WebRTC. STUN finds the public address; TURN relays the traffic when a network
+ * (mobile carrier NAT, school/company Wi-Fi, VPN) blocks direct connections. PeerJS' free TURN
+ * service was shut down, so a relay only works once TURN_SERVERS is filled in.
+ */
+const TURN_SERVERS: RTCIceServer[] = [];
+const PEER_CONFIG = {
+  debug: 0,
+  config: {
+    iceServers: [
+      { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] },
+      ...TURN_SERVERS,
+    ],
+  },
+};
+const BLOCKED_MSG =
+  'Keine Verbindung möglich: Dein Netzwerk blockiert die direkte Verbindung zum Host. ' +
+  'Tipp: WLAN statt mobiler Daten (oder umgekehrt) probieren, VPN oder Werbeblocker-Apps ausschalten.';
+
+const TIMEOUT_MSG =
+  'Zeitüberschreitung: Der Raum wurde gefunden, aber es kam keine Verbindung zustande. Meist blockiert das Netzwerk ' +
+  'die direkte Verbindung. Tipp: WLAN statt mobiler Daten (oder umgekehrt) probieren, VPN oder Werbeblocker-Apps ausschalten.';
+
 const useLocal = () => new URLSearchParams(location.search).get('net') === 'local';
 
 // ---------------------------------------------------------------- PeerJS
@@ -90,7 +113,7 @@ function hostPeer(): Promise<HostTransport> {
     let tries = 0;
     const attempt = () => {
       const code = makeCode();
-      const peer = new Peer(PREFIX + code, { debug: 0 });
+      const peer = new Peer(PREFIX + code, PEER_CONFIG);
       let opened = false;
       const links = new Map<string, PeerLink>();
       let seq = 0;
@@ -144,8 +167,9 @@ function hostPeer(): Promise<HostTransport> {
 
 function joinPeer(code: string): Promise<ClientTransport> {
   return new Promise((resolve, reject) => {
-    const peer = new Peer({ debug: 0 });
+    const peer = new Peer(PEER_CONFIG);
     let done = false;
+    let opened = false;
     let lastSeen = performance.now();
     let watchdog = 0;
     const t = new ClientT(() => {
@@ -158,16 +182,24 @@ function joinPeer(code: string): Promise<ClientTransport> {
       peer.destroy();
       reject(new Error(msg));
     };
-    const timer = setTimeout(() => fail('Zeitüberschreitung – der Raum antwortet nicht. Ist der Host noch im Raum?'), 15000);
+    const timer = setTimeout(() => fail(TIMEOUT_MSG), 20000);
     peer.on('error', (e) => {
       if (!done) fail(peerError(e));
       else t.onClose(peerError(e));
     });
     peer.on('open', () => {
       const conn = peer.connect(PREFIX + code, { reliable: true, serialization: 'json' });
+      // the room exists, but the direct connection (and every relay) failed
+      conn.on('iceStateChanged', (state) => {
+        if (state === 'failed' && !opened) { clearTimeout(timer); fail(BLOCKED_MSG); }
+      });
+      conn.on('error', () => {
+        if (!opened) { clearTimeout(timer); fail(BLOCKED_MSG); }
+      });
       conn.on('open', () => {
         clearTimeout(timer);
         done = true;
+        opened = true;
         t.send = (m) => {
           try { if (conn.open) conn.send(m); } catch { /* ignore */ }
         };
@@ -186,7 +218,7 @@ function joinPeer(code: string): Promise<ClientTransport> {
       });
       conn.on('close', () => {
         clearInterval(watchdog);
-        if (done) t.onClose('Der Host hat das Spiel beendet.');
+        if (opened) t.onClose('Der Host hat das Spiel beendet.');
       });
     });
   });
