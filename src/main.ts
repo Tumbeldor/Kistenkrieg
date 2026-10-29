@@ -837,23 +837,18 @@ const inviteCode = () => {
 };
 let pendingInvite = '';
 
-/** Opened via invite link: join right away; first-time players pick a name first. */
+/** Opened via invite link: ask for the nickname first (pre-filled if known), then join. */
 function handleInvite(code: string) {
   $<HTMLInputElement>('join-code').value = code;
   $('invite-code').textContent = code;
   $('invite-box').hidden = false;
-  if (profile.named) {
-    go('online');
-    void joinRoom(code);
-    return;
-  }
   pendingInvite = code;
   $('name-code').textContent = code;
   $('name-err').textContent = '';
   const inp = $<HTMLInputElement>('name-first');
-  inp.value = '';
+  inp.value = profile.named ? profile.name : '';
   ui.show('name');
-  setTimeout(() => inp.focus(), 60);
+  setTimeout(() => { inp.focus(); inp.select(); }, 60);
 }
 
 $('name-form').addEventListener('submit', (e) => {
