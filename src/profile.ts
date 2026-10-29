@@ -1,6 +1,6 @@
 // Local profile: progression, loadout, stats and settings (stored in localStorage).
 import {
-  IS_TEST, DIFFS, HATS, MatchSettings, PERKS, PerkId, SKINS, WEAPONS, WEAPON_LIST, WeaponId, XP, levelInfo,
+  IS_TEST, DIFFS, HATS, MAX_LEVEL, MatchSettings, PERKS, PerkId, SKINS, WEAPONS, WEAPON_LIST, WeaponId, XP, levelInfo, xpToNext, xpToNextV1,
 } from './config';
 import type { MatchResult } from './game';
 
@@ -9,6 +9,7 @@ export interface Profile {
   name: string;
   named: boolean; // the player picked a name themselves (else ask before joining via invite link)
   xp: number;
+  xpCurve: number; // XP curve version the xp value belongs to
   skin: string;
   hat: string;
   primary: WeaponId;
@@ -25,10 +26,23 @@ const KEY = IS_TEST ? 'kistenkrieg.test.profile.v1' : MAIN_KEY;
 function fresh(): Profile {
   const n = Math.floor(Math.random() * 900 + 100);
   return {
-    v: 1, name: `Spieler${n}`, named: false, xp: 0, skin: 'woodland', hat: 'none', primary: 'smg', perk: 'none',
+    v: 1, name: `Spieler${n}`, named: false, xp: 0, xpCurve: 2, skin: 'woodland', hat: 'none', primary: 'smg', perk: 'none',
     stats: { kills: 0, deaths: 0, matches: 0, wins: 0, bestWave: 0, playTime: 0 },
     settings: { volume: 0.7, showFps: false, aimAssist: true },
   };
+}
+
+/** Converts XP of the first curve so the player keeps their level and progress within it. */
+export function migrateXp(oldXp: number): number {
+  let level = 1;
+  let rest = oldXp;
+  while (level < MAX_LEVEL && rest >= xpToNextV1(level)) {
+    rest -= xpToNextV1(level);
+    level++;
+  }
+  let xp = 0;
+  for (let l = 1; l < level; l++) xp += xpToNext(l);
+  return xp + (level < MAX_LEVEL ? Math.floor((rest / xpToNextV1(level)) * xpToNext(level)) : rest);
 }
 
 export function sanitize(raw: unknown): Profile {
@@ -39,7 +53,8 @@ export function sanitize(raw: unknown): Profile {
     ...base,
     name: typeof r.name === 'string' && r.name.trim() ? cleanName(r.name) : base.name,
     named: typeof r.named === 'boolean' ? r.named : typeof r.name === 'string' && !/^Spieler\d{3}$/.test(r.name.trim()),
-    xp: typeof r.xp === 'number' && isFinite(r.xp) && r.xp >= 0 ? Math.floor(r.xp) : 0,
+    xp: typeof r.xp === 'number' && isFinite(r.xp) && r.xp >= 0 ? (r.xpCurve === 2 ? Math.floor(r.xp) : migrateXp(Math.floor(r.xp))) : 0,
+    xpCurve: 2,
     skin: SKINS.some((s) => s.id === r.skin) ? r.skin! : base.skin,
     hat: HATS.some((h) => h.id === r.hat) ? r.hat! : base.hat,
     primary: WEAPON_LIST.includes(r.primary as WeaponId) ? (r.primary as WeaponId) : base.primary,

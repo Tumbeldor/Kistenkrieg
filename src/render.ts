@@ -2,7 +2,7 @@
 import { GUN_TIERS, MapId, TEAM_COLORS, TEAM_NAMES, WEAPONS, WeaponId, skinDef } from './config';
 import type { Fx } from './fx';
 import type { Game, Player } from './game';
-import { sameTeam } from './game';
+import { FLAME_LIFE, sameTeam } from './game';
 import type { Input } from './input';
 import { GameMap, Solid } from './map';
 import { dist } from './geom';
@@ -318,7 +318,17 @@ export class Renderer {
     for (const b of g.bullets) {
       if (!inView(b.x, b.y, 40)) continue;
       const def = WEAPONS[b.w];
-      if (def.kind === 'flame') {
+      if (def.kind === 'flame' && b.vx === 0 && b.vy === 0) {
+        // burning ground: flickers and fades out during its last 3 seconds
+        const fade = Math.min(1, (FLAME_LIFE - b.age) / 3);
+        const fl = 0.75 + Math.sin(this.time * 17 + b.x * 0.37) * 0.25;
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = Math.max(0, 0.3 * fade * fl);
+        ctx.fillStyle = fl > 0.85 ? '#ffb347' : '#e0632b';
+        ctx.beginPath(); ctx.arc(b.x, b.y, 10 + fl * 4, 0, 7); ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+      } else if (def.kind === 'flame') {
         const k = b.travelled / b.range;
         const r = 7 + k * 26;
         ctx.globalCompositeOperation = 'lighter';

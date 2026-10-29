@@ -124,7 +124,7 @@ export class Bot {
         } else inp.fire = true;
       }
       // grenades at medium range (smarter bots more often)
-      if (me.grenades > 0 && dd > 220 && dd < 520 && this.seenT > d.reaction && Math.random() < dt * (d.smart ? 0.25 : 0.06)) {
+      if (me.grenades > 0 && dd > 220 && dd < 520 && this.seenT > d.reaction && Math.random() < dt * (d.smart ? 0.15 : 0.04)) {
         inp.throw = true;
         inp.throwDist = dd + rand(-40, 40) * (1 - d.lead * 0.5);
       }

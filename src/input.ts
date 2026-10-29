@@ -82,18 +82,18 @@ export class Input {
     const br = small ? 27 : 32;
     this.stickR = small ? 56 : 66;
     const rx = W - safeR - br - 14;
-    // reload / swap sit in the lower right, clear of the pause button, but above the bottom edge
+    // right edge column: reload, grenade below it, weapon swap at the very bottom corner
     const gap = 14;
-    const maxY = H - safeB - 22 - br; // lowest allowed centre of the swap button
-    const swapY = Math.min(maxY, H * 0.62);
-    const reloadY = swapY - br * 2 - gap;
+    const swapY = H - Math.max(safeB, 6) - br - 8;
+    const midY = Math.min(swapY - br * 2 - gap, H * 0.62);
+    const reloadY = midY - br * 2 - gap;
     const prev = new Map(this.buttons.map((b) => [b.id, b.touch]));
     this.buttons = [
       { id: 'pause', x: W - safeR - 30, y: 30, r: 22, touch: null },
       { id: 'score', x: W - safeR - 84, y: 30, r: 22, touch: null },
       { id: 'reload', x: rx, y: reloadY, r: br, touch: null },
       { id: 'swap', x: rx, y: swapY, r: br, touch: null },
-      { id: 'grenade', x: rx - br * 2 - gap, y: swapY, r: br * 0.85, touch: null },
+      { id: 'grenade', x: rx, y: midY, r: br, touch: null },
     ];
     for (const b of this.buttons) b.touch = prev.get(b.id) ?? null;
     void safeL;

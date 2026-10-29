@@ -70,6 +70,7 @@ export interface Player extends PlayerInfo {
   grenades: number;
   nextThrow: number;
   tier: number; // Waffenmeister: index into GUN_TIERS
+  lastBurnAt: number;
   // client-side interpolation buffer
   buf: { t: number; x: number; y: number; a: number }[];
 }
@@ -137,6 +138,8 @@ const BOSS_NAMES = ['Juggernaut', 'Koloss', 'Bollwerk', 'Titan', 'Rammbock'];
 
 /** Distance a full-power hand grenade travels before it explodes (speed · (1 − 0.3^fuse) / ln(1/0.3)). */
 const GRENADE_REACH = (WEAPONS.grenade.speed * (1 - Math.pow(0.3, WEAPONS.grenade.fuse))) / Math.log(1 / 0.3);
+/** Fire from the flamethrower is gone after this many seconds. */
+export const FLAME_LIFE = 10;
 const grenadeCount = (perk: PerkId) => GRENADES + (perk === 'grenadier' ? 2 : 0);
 
 /** Outward surface normal of a solid at a point on its edge. */
@@ -216,7 +219,7 @@ export class Game {
       slots: loadout(info.primary, info.perk), cur: 0, wid: info.primary, reloading: false,
       kills: 0, deaths: 0, score: 0, streak: 0, lastShotAt: -9, lastHurtAt: -9, lastAttacker: null, killedBy: null,
       spawnSeq: 0, dmgMul: 1, brain: null, removeT: 0, buf: [],
-      grenades: grenadeCount(info.perk), nextThrow: 0, tier: 0,
+      grenades: grenadeCount(info.perk), nextThrow: 0, tier: 0, lastBurnAt: -9,
     };
     if (this.settings.mode === 'gungame') { p.slots = this.armSlots(p); p.wid = p.slots[0].id; }
     if (info.bot) {
@@ -554,6 +557,16 @@ export class Game {
         const drag = Math.pow(0.12, dt);
         b.vx *= drag;
         b.vy *= drag;
+        if (b.age >= FLAME_LIFE) { b.dead = true; continue; }
+        if (b.vx * b.vx + b.vy * b.vy < 30 * 30) {
+          // the flame came to rest: some of them keep burning on the ground, the rest go out
+          if (b.vx !== 0 || b.vy !== 0) {
+            if (Math.random() > 0.35) { b.dead = true; continue; }
+            b.vx = b.vy = 0;
+          }
+          if (!b.visual) this.burnGround(b);
+          continue;
+        }
       } else if (def.kind === 'grenade') {
         const drag = Math.pow(0.3, dt);
         b.vx *= drag;
@@ -645,6 +658,16 @@ export class Game {
       }
     }
     this.bullets = this.bullets.filter((b) => !b.dead);
+  }
+
+  /** Burning ground hurts players standing in it (at most every 0.25 s per player). */
+  private burnGround(b: Bullet) {
+    for (const o of this.list) {
+      if (!o.alive || o.id === b.owner || (b.team >= 0 && o.team === b.team)) continue;
+      if (this.time - o.lastBurnAt < 0.25 || dist2(b.x, b.y, o.x, o.y) > (o.r + 16) ** 2) continue;
+      o.lastBurnAt = this.time;
+      this.damagePlayer(o, 4, this.players.get(b.owner) ?? null, 'flamer', o.x, o.y);
+    }
   }
 
   removeBullet(id: string) {

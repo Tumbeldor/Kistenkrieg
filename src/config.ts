@@ -163,14 +163,14 @@ export interface DiffDef {
   sight: number; lead: number; strafe: number; hunt: number; smart: boolean;
 }
 export const DIFFS: Record<DiffId, DiffDef> = {
-  easy: { id: 'easy', name: 'Leicht', desc: 'Entspannt – Bots zielen schlecht.', xp: 0.7, reaction: 0.65, aimErr: 0.2, turn: 4,
-    dmgMul: 0.6, hpMul: 0.85, sight: 520, lead: 0, strafe: 0.35, hunt: 0.45, smart: false },
-  normal: { id: 'normal', name: 'Normal', desc: 'Faire Gegner.', xp: 1, reaction: 0.42, aimErr: 0.11, turn: 7,
-    dmgMul: 0.8, hpMul: 1, sight: 600, lead: 0.35, strafe: 0.7, hunt: 0.65, smart: false },
-  hard: { id: 'hard', name: 'Schwer', desc: 'Bots weichen aus, holen sich Medikits.', xp: 1.4, reaction: 0.26, aimErr: 0.06, turn: 11,
-    dmgMul: 0.95, hpMul: 1, sight: 660, lead: 0.75, strafe: 1, hunt: 0.85, smart: true },
-  insane: { id: 'insane', name: 'Albtraum', desc: 'Nur für Profis.', xp: 1.9, reaction: 0.15, aimErr: 0.03, turn: 16,
-    dmgMul: 1.1, hpMul: 1.15, sight: 690, lead: 1, strafe: 1, hunt: 1, smart: true },
+  easy: { id: 'easy', name: 'Leicht', desc: 'Entspannt – Bots zielen schlecht.', xp: 0.7, reaction: 0.8, aimErr: 0.25, turn: 3.5,
+    dmgMul: 0.5, hpMul: 0.85, sight: 520, lead: 0, strafe: 0.35, hunt: 0.45, smart: false },
+  normal: { id: 'normal', name: 'Normal', desc: 'Faire Gegner.', xp: 1, reaction: 0.55, aimErr: 0.15, turn: 6,
+    dmgMul: 0.7, hpMul: 1, sight: 600, lead: 0.25, strafe: 0.7, hunt: 0.65, smart: false },
+  hard: { id: 'hard', name: 'Schwer', desc: 'Bots weichen aus, holen sich Medikits.', xp: 1.4, reaction: 0.36, aimErr: 0.085, turn: 9,
+    dmgMul: 0.85, hpMul: 1, sight: 660, lead: 0.6, strafe: 1, hunt: 0.85, smart: true },
+  insane: { id: 'insane', name: 'Albtraum', desc: 'Nur für Profis.', xp: 1.9, reaction: 0.22, aimErr: 0.05, turn: 13,
+    dmgMul: 1.0, hpMul: 1.1, sight: 690, lead: 0.85, strafe: 1, hunt: 1, smart: true },
 };
 export const DIFF_LIST: DiffId[] = ['easy', 'normal', 'hard', 'insane'];
 
@@ -229,7 +229,10 @@ export const SPAWN_PROTECT = 1.6;
 
 // Progression
 export const MAX_LEVEL = 30;
-export const xpToNext = (level: number) => 250 + 100 * level;
+/** XP needed from `level` to `level + 1` (curve v2: about twice as long as v1 to reach level 30). */
+export const xpToNext = (level: number) => 400 + 180 * level;
+/** First curve, only used to migrate old save games so nobody loses a level. */
+export const xpToNextV1 = (level: number) => 250 + 100 * level;
 export function levelInfo(totalXp: number): { level: number; into: number; need: number } {
   let level = 1;
   let rest = totalXp;
@@ -240,7 +243,7 @@ export function levelInfo(totalXp: number): { level: number; into: number; need:
   return { level, into: rest, need: level >= MAX_LEVEL ? 0 : xpToNext(level) };
 }
 
-export const XP = { kill: 100, finish: 100, win: 300, second: 150, third: 75, wave: 80, online: 0.2 };
+export const XP = { kill: 80, finish: 100, win: 300, second: 150, third: 75, wave: 60, online: 0.2 };
 
 export interface Unlock { level: number; kind: 'Waffe' | 'Perk' | 'Tarnung' | 'Kopfbedeckung'; name: string }
 export function allUnlocks(): Unlock[] {
