@@ -161,16 +161,18 @@ export interface DiffDef {
   reaction: number; aimErr: number; turn: number; dmgMul: number; hpMul: number;
   /** Half-width of the bot's view box (like a player's screen); half-height is half of it. */
   sight: number; lead: number; strafe: number; hunt: number; smart: boolean;
+  /** Movement speed relative to a player. */
+  speed: number;
 }
 export const DIFFS: Record<DiffId, DiffDef> = {
   easy: { id: 'easy', name: 'Leicht', desc: 'Entspannt – Bots zielen schlecht.', xp: 0.7, reaction: 0.8, aimErr: 0.25, turn: 3.5,
-    dmgMul: 0.5, hpMul: 0.85, sight: 520, lead: 0, strafe: 0.35, hunt: 0.45, smart: false },
+    dmgMul: 0.5, hpMul: 0.85, sight: 520, lead: 0, strafe: 0.35, hunt: 0.45, smart: false, speed: 0.8 },
   normal: { id: 'normal', name: 'Normal', desc: 'Faire Gegner.', xp: 1, reaction: 0.55, aimErr: 0.15, turn: 6,
-    dmgMul: 0.7, hpMul: 1, sight: 600, lead: 0.25, strafe: 0.7, hunt: 0.65, smart: false },
+    dmgMul: 0.7, hpMul: 1, sight: 600, lead: 0.25, strafe: 0.7, hunt: 0.65, smart: false, speed: 0.84 },
   hard: { id: 'hard', name: 'Schwer', desc: 'Bots weichen aus, holen sich Medikits.', xp: 1.4, reaction: 0.36, aimErr: 0.085, turn: 9,
-    dmgMul: 0.85, hpMul: 1, sight: 660, lead: 0.6, strafe: 1, hunt: 0.85, smart: true },
+    dmgMul: 0.85, hpMul: 1, sight: 660, lead: 0.6, strafe: 1, hunt: 0.85, smart: true, speed: 0.88 },
   insane: { id: 'insane', name: 'Albtraum', desc: 'Nur für Profis.', xp: 1.9, reaction: 0.22, aimErr: 0.05, turn: 13,
-    dmgMul: 1.0, hpMul: 1.1, sight: 690, lead: 0.85, strafe: 1, hunt: 1, smart: true },
+    dmgMul: 1.0, hpMul: 1.1, sight: 690, lead: 0.85, strafe: 1, hunt: 1, smart: true, speed: 0.92 },
 };
 export const DIFF_LIST: DiffId[] = ['easy', 'normal', 'hard', 'insane'];
 

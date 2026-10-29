@@ -391,8 +391,10 @@ export class Game {
     let mx = inp.mx, my = inp.my;
     const m = Math.hypot(mx, my);
     if (m > 1) { mx /= m; my /= m; }
-    const speed = BASE_SPEED * def.moveMul * (p.perk === 'swift' ? 1.12 : 1) * (p.boss ? 0.8 : 1) * (slot.spin > 0.5 ? 0.85 : 1);
-    const k = Math.min(1, dt * 14);
+    const botMul = p.bot ? DIFFS[this.settings.diff].speed : 1;
+    const speed = BASE_SPEED * def.moveMul * botMul * (p.perk === 'swift' ? 1.12 : 1) * (p.boss ? 0.8 : 1) * (slot.spin > 0.5 ? 0.85 : 1);
+    // bots accelerate a little softer so direction changes look less twitchy
+    const k = Math.min(1, dt * (p.bot ? 9 : 14));
     p.vx += (mx * speed - p.vx) * k;
     p.vy += (my * speed - p.vy) * k;
     this.map.moveCircle(p, p.vx * dt, p.vy * dt, p.r);
