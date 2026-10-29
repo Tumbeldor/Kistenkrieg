@@ -138,6 +138,12 @@ const BOSS_NAMES = ['Juggernaut', 'Koloss', 'Bollwerk', 'Titan', 'Rammbock'];
 
 /** Distance a full-power hand grenade travels before it explodes (speed · (1 − 0.3^fuse) / ln(1/0.3)). */
 const GRENADE_REACH = (WEAPONS.grenade.speed * (1 - Math.pow(0.3, WEAPONS.grenade.fuse))) / Math.log(1 / 0.3);
+/** Survival: regular enemies in a wave (a boss wave has two fewer plus the boss). */
+export const waveSize = (wave: number, humans: number) =>
+  Math.max(2, Math.round(2 + wave * 0.9 + (humans - 1) * (0.5 + wave * 0.3)) - (wave % 5 === 0 ? 2 : 0));
+/** Survival: enemies alive at the same time. */
+export const waveCap = (wave: number, humans: number) => Math.min(3 + Math.floor(wave / 2) + (humans - 1), 8, MAX_TOTAL - humans);
+
 /** Fire from the flamethrower is gone after this many seconds. */
 export const FLAME_LIFE = 10;
 const grenadeCount = (perk: PerkId) => GRENADES + (perk === 'grenadier' ? 2 : 0);
@@ -859,8 +865,8 @@ export class Game {
     if (this.waveToSpawn > 0) {
       this.waveSpawnT -= dt;
       const aliveEnemies = enemies.filter((p) => p.alive).length;
-      if (this.waveSpawnT <= 0 && aliveEnemies < Math.min(10, MAX_TOTAL - humans.length) ) {
-        this.waveSpawnT = Math.max(0.35, 1.2 - this.wave * 0.05);
+      if (this.waveSpawnT <= 0 && aliveEnemies < waveCap(this.wave, humans.length)) {
+        this.waveSpawnT = Math.max(0.6, 1.6 - this.wave * 0.05);
         this.spawnWaveBot();
       }
     } else if (enemies.every((p) => !p.alive)) {
@@ -878,7 +884,7 @@ export class Game {
     this.wave++;
     const humans = this.list.filter((p) => !p.bot).length;
     const boss = this.wave % 5 === 0;
-    this.waveToSpawn = Math.round(2 + this.wave * 1.6 + (humans - 1) * (1 + this.wave * 0.5)) - (boss ? 3 : 0);
+    this.waveToSpawn = waveSize(this.wave, humans);
     this.waveSpawnT = 0.5;
     if (boss) {
       this.addBot(1, { boss: true, hpMul: 5 + this.wave * 0.4, weapon: this.wave >= 10 ? 'rocket' : 'minigun' });
@@ -888,11 +894,11 @@ export class Game {
 
   private spawnWaveBot() {
     const w = this.wave;
-    const pool: WeaponId[] = w <= 2 ? ['pistol', 'smg', 'revolver'] : w <= 4 ? ['smg', 'shotgun', 'pistol', 'rifle', 'crossbow', 'smgsil']
-      : w <= 7 ? ['smg', 'shotgun', 'rifle', 'sniper', 'flamer', 'dmr', 'lmg', 'autoshotgun']
+    const pool: WeaponId[] = w <= 3 ? ['pistol', 'smg', 'revolver'] : w <= 6 ? ['smg', 'shotgun', 'pistol', 'rifle', 'crossbow', 'smgsil']
+      : w <= 10 ? ['smg', 'shotgun', 'rifle', 'sniper', 'flamer', 'dmr', 'lmg', 'autoshotgun']
       : ['rifle', 'shotgun', 'sniper', 'minigun', 'flamer', 'rocket', 'rail', 'lmg', 'autoshotgun', 'gl'];
     this.waveToSpawn--;
-    this.addBot(1, { hpMul: 1 + 0.07 * (w - 1), weapon: pick(pool) });
+    this.addBot(1, { hpMul: 1 + 0.05 * (w - 1), weapon: pick(pool) });
   }
 
   private checkEnd() {
