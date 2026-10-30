@@ -180,7 +180,7 @@ export type ModeId = 'dm' | 'team' | 'survival' | 'gungame';
 export const MODES: Record<ModeId, { id: ModeId; name: string; desc: string; coop: boolean }> = {
   dm: { id: 'dm', name: 'Jeder gegen jeden', desc: 'Freie Schlacht gegen Freunde und Bots. Wer zuerst das Kill-Limit erreicht, gewinnt.', coop: false },
   team: { id: 'team', name: 'Team vs. Bots', desc: 'Koop: Ihr spielt zusammen als Team gegen ein Bot-Team.', coop: true },
-  survival: { id: 'survival', name: 'Überleben', desc: 'Koop: Haltet so viele Bot-Wellen wie möglich durch. Gefallene Mitspieler könnt ihr wiederbeleben. Alle 5 Wellen kommt ein Boss.', coop: true },
+  survival: { id: 'survival', name: 'Überleben', desc: 'Koop: Haltet so viele Bot-Wellen wie möglich durch. Alle 5 Wellen kommt ein Boss.', coop: true },
   gungame: { id: 'gungame', name: 'Waffenmeister', desc: 'Jede Eliminierung bringt dich zur nächsten Waffe. Wer zuerst alle 13 Stufen schafft, gewinnt.', coop: false },
 };
 export const MODE_LIST: ModeId[] = ['dm', 'gungame', 'team', 'survival'];
@@ -245,7 +245,7 @@ export function levelInfo(totalXp: number): { level: number; into: number; need:
   return { level, into: rest, need: level >= MAX_LEVEL ? 0 : xpToNext(level) };
 }
 
-export const XP = { kill: 80, revive: 60, finish: 100, win: 300, second: 150, third: 75, wave: 60, online: 0.2 };
+export const XP = { kill: 80, finish: 100, win: 300, second: 150, third: 75, wave: 60, online: 0.2 };
 
 export interface Unlock { level: number; kind: 'Waffe' | 'Perk' | 'Tarnung' | 'Kopfbedeckung'; name: string }
 export function allUnlocks(): Unlock[] {

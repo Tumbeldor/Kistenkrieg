@@ -272,10 +272,9 @@ export function renderResults(res: MatchResult, myId: string, rep: XpReport | nu
 
   const tbl = $('res-table');
   const rows = [...res.rows].sort((a, b) => a.place - b.place);
-  const rv = res.mode === 'survival' && rows.length > 1; // revives only exist with team mates
-  tbl.innerHTML = `<tr><th>#</th><th>Spieler</th><th>Kills</th><th>Tode</th>${rv ? '<th>Rettungen</th>' : ''}<th>Punkte</th></tr>` + rows.map((r) => {
+  tbl.innerHTML = `<tr><th>#</th><th>Spieler</th><th>Kills</th><th>Tode</th><th>Punkte</th></tr>` + rows.map((r) => {
     const tc = r.team === 0 ? 't0' : r.team === 1 ? 't1' : '';
-    return `<tr class="${r.id === myId ? 'me' : ''}"><td>${r.place}</td><td class="${tc}">${esc(r.name)}</td><td>${r.kills}</td><td>${r.deaths}</td>${rv ? `<td>${r.rv ?? 0}</td>` : ''}<td>${r.score}</td></tr>`;
+    return `<tr class="${r.id === myId ? 'me' : ''}"><td>${r.place}</td><td class="${tc}">${esc(r.name)}</td><td>${r.kills}</td><td>${r.deaths}</td><td>${r.score}</td></tr>`;
   }).join('');
   if (res.mode === 'team') tbl.insertAdjacentHTML('afterbegin', `<caption class="muted">${TEAM_NAMES[0]} vs ${TEAM_NAMES[1]}</caption>`);
 

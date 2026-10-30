@@ -209,20 +209,6 @@ export class Fx {
       }
       case 'spawn': {
         const p = g.players.get(ev.p);
-        if (ev.rv) {
-          this.add({ x: ev.x, y: ev.y, kind: 'ring', color: '#9ccc96', life: 0.6, size: 12, grow: 110 });
-          this.feed.push({ kn: '', kc: '#ccc', vn: name(ev.rv), vc: color(ev.rv), w: '', t: 4, mine: ev.p === local || ev.rv === local, info: `hat ${name(ev.p)} wiederbelebt` });
-          if (this.feed.length > 6) this.feed.shift();
-          if (ev.p === local) {
-            this.hurt = 0;
-            this.message('Wiederbelebt', `von ${name(ev.rv)}`, '#9ccc96', 2);
-            sfx.sfxRevive();
-          } else if (ev.rv === local) {
-            this.text(ev.x, ev.y - 40, '+50', '#9ccc96', 16);
-            sfx.sfxRevive();
-          }
-          break;
-        }
         if (p) this.add({ x: ev.x, y: ev.y, kind: 'ring', color: '#9fbfcf', life: 0.5, size: 10, grow: 90 });
         if (ev.p === local) this.hurt = 0;
         break;
