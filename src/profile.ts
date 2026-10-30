@@ -122,6 +122,7 @@ export function computeXp(res: MatchResult, myId: string, settings: MatchSetting
   let won = false;
   const place = row?.place ?? 0;
   if (kills) lines.push({ label: `${kills} Eliminierungen`, xp: kills * XP.kill });
+  if (row?.rv) lines.push({ label: row.rv === 1 ? '1 Wiederbelebung' : `${row.rv} Wiederbelebungen`, xp: row.rv * XP.revive });
   lines.push({ label: 'Match beendet', xp: XP.finish });
   if (res.mode === 'dm' || res.mode === 'gungame') {
     if (place === 1) { lines.push({ label: '1. Platz', xp: XP.win }); won = true; }

@@ -367,6 +367,14 @@ export function sfxPickup(kind: string) {
   else { tone(o, 'sine', 600, 600, 0.08, 0.28); tone(o, 'sine', 900, 900, 0.12, 0.28, 0.08); }
 }
 
+/** Survival: a team mate is back on their feet. */
+export function sfxRevive() {
+  if (!allow()) return;
+  const o = bus(0.5, 0);
+  [440, 554, 659, 880].forEach((f, i) => tone(o, 'sine', f, f, 0.16, 0.26, i * 0.08));
+  burst(o, 0.25, 1800, 900, 0.6, 0.12, 'bandpass', 0.05);
+}
+
 /** Weapon-specific reload; `dur` is the reload time so the clicks line up with the reload ring. */
 export function sfxReload(w: WeaponId = 'rifle', dur = 1.5) {
   if (!allow()) return;

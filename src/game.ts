@@ -71,6 +71,8 @@ export interface Player extends PlayerInfo {
   nextThrow: number;
   tier: number; // Waffenmeister: index into GUN_TIERS
   lastBurnAt: number;
+  revive: number; // survival: revive progress 0..1 while downed
+  revives: number; // survival: team mates this player brought back
   // client-side interpolation buffer
   buf: { t: number; x: number; y: number; a: number }[];
 }
@@ -96,7 +98,7 @@ export interface Bullet {
 
 export interface Pickup { i: number; x: number; y: number; kind: PickupKind; w: WeaponId | null; on: boolean; t: number }
 
-export interface ResultRow { id: string; name: string; bot: boolean; team: number; kills: number; deaths: number; score: number; place: number }
+export interface ResultRow { id: string; name: string; bot: boolean; team: number; kills: number; deaths: number; score: number; place: number; rv?: number }
 export interface MatchResult { mode: MatchSettings['mode']; winnerTeam: number | null; winnerId: string | null; rows: ResultRow[]; wave: number; duration: number }
 
 export type GameEvent =
@@ -110,7 +112,7 @@ export type GameEvent =
   | { e: 'pk'; i: number; on: 0 | 1; w?: WeaponId | null }
   | { e: 'give'; p: string; w: WeaponId }
   | { e: 'heal'; p: string; kind: PickupKind }
-  | { e: 'spawn'; p: string; x: number; y: number; sq: number }
+  | { e: 'spawn'; p: string; x: number; y: number; sq: number; rv?: string } // rv = reviver (survival)
   | { e: 'join'; pl: PlayerInfo }
   | { e: 'leave'; p: string }
   | { e: 'wave'; n: number; boss: boolean }
@@ -143,6 +145,11 @@ export const waveSize = (wave: number, humans: number) =>
   Math.max(2, Math.round(2 + wave * 0.9 + (humans - 1) * (0.5 + wave * 0.3)) - (wave % 5 === 0 ? 2 : 0));
 /** Survival: enemies alive at the same time. */
 export const waveCap = (wave: number, humans: number) => Math.min(3 + Math.floor(wave / 2) + (humans - 1), 8, MAX_TOTAL - humans);
+
+/** Survival: a downed player is back on their feet after a team mate stood next to them this long. */
+export const REVIVE_TIME = 3;
+export const REVIVE_RANGE = 75;
+const REVIVE_HP = 0.5;
 
 /** Fire from the flamethrower is gone after this many seconds. */
 export const FLAME_LIFE = 10;
@@ -225,7 +232,7 @@ export class Game {
       slots: loadout(info.primary, info.perk), cur: 0, wid: info.primary, reloading: false,
       kills: 0, deaths: 0, score: 0, streak: 0, lastShotAt: -9, lastHurtAt: -9, lastAttacker: null, killedBy: null,
       spawnSeq: 0, dmgMul: 1, brain: null, removeT: 0, buf: [],
-      grenades: grenadeCount(info.perk), nextThrow: 0, tier: 0, lastBurnAt: -9,
+      grenades: grenadeCount(info.perk), nextThrow: 0, tier: 0, lastBurnAt: -9, revive: 0, revives: 0,
     };
     if (this.settings.mode === 'gungame') { p.slots = this.armSlots(p); p.wid = p.slots[0].id; }
     if (info.bot) {
@@ -250,7 +257,10 @@ export class Game {
   removePlayer(id: string) {
     if (!this.players.delete(id)) return;
     this.list = [...this.players.values()];
-    if (this.authority) this.emit({ e: 'leave', p: id });
+    if (this.authority) {
+      this.emit({ e: 'leave', p: id });
+      this.checkEnd(); // survival: the last standing player left while the others are down
+    }
   }
 
   /** Change loadout (takes effect on next spawn). */
@@ -341,9 +351,37 @@ export class Game {
     p.grenades = grenadeCount(p.perk);
     p.spawnSeq++;
     p.killedBy = null;
+    p.revive = 0;
     p.buf.length = 0;
     if (p.brain) p.brain.reset();
     this.emit({ e: 'spawn', p: p.id, x: Math.round(p.x), y: Math.round(p.y), sq: p.spawnSeq });
+  }
+
+  /** Survival: alive human team mate standing close enough to revive `p`. */
+  reviverOf(p: Player): Player | undefined {
+    return this.list.find((o) => o !== p && o.alive && !o.bot && sameTeam(o, p) && dist2(o.x, o.y, p.x, p.y) < REVIVE_RANGE ** 2);
+  }
+
+  private tickRevive(p: Player, dt: number) {
+    const by = this.reviverOf(p);
+    if (!by) {
+      p.revive = Math.max(0, p.revive - dt / REVIVE_TIME);
+      return;
+    }
+    p.revive += dt / REVIVE_TIME;
+    if (p.revive < 1) return;
+    // back up where they fell, keeping their weapons and half their health
+    p.alive = true;
+    p.revive = 0;
+    p.hp = Math.round(p.maxHp * REVIVE_HP);
+    p.vx = p.vy = 0;
+    p.protectT = SPAWN_PROTECT;
+    p.spawnSeq++;
+    p.killedBy = null;
+    p.buf.length = 0;
+    by.revives++;
+    by.score += 50;
+    this.emit({ e: 'spawn', p: p.id, x: Math.round(p.x), y: Math.round(p.y), sq: p.spawnSeq, rv: by.id });
   }
 
   // ------------------------------------------------------------ main update
@@ -364,7 +402,7 @@ export class Game {
         if (this.authority && this.settings.mode !== 'survival') {
           p.respawnT -= dt;
           if (p.respawnT <= 0) this.spawnPlayer(p);
-        }
+        } else if (this.authority && !p.bot) this.tickRevive(p, dt);
         continue;
       }
       if (p.protectT > 0) p.protectT -= dt;
@@ -705,6 +743,7 @@ export class Game {
     v.streak = 0;
     v.respawnT = RESPAWN_TIME;
     v.removeT = 1.5;
+    v.revive = 0;
     v.killedBy = k && k !== v ? k.id : null;
     if (k && k !== v) {
       k.kills++;
@@ -918,7 +957,7 @@ export class Game {
     const s = this.settings;
     const rows: ResultRow[] = this.list
       .filter((p) => !(s.mode === 'survival' && p.bot && p.team === 1))
-      .map((p) => ({ id: p.id, name: p.name, bot: p.bot, team: p.team, kills: p.kills, deaths: p.deaths, score: p.score, place: 0 }));
+      .map((p) => ({ id: p.id, name: p.name, bot: p.bot, team: p.team, kills: p.kills, deaths: p.deaths, score: p.score, place: 0, rv: p.revives }));
     if (s.mode === 'gungame') rows.sort((a, b) => b.score - a.score || b.kills - a.kills || a.deaths - b.deaths);
     else rows.sort((a, b) => b.kills - a.kills || a.deaths - b.deaths || b.score - a.score);
     rows.forEach((r, i) => (r.place = i + 1));
@@ -948,7 +987,7 @@ export class Game {
     const ps: SnapPlayer[] = this.list.map((p) => [
       p.id, Math.round(p.x * 10) / 10, Math.round(p.y * 10) / 10, Math.round(p.aim * 100) / 100, Math.ceil(p.hp), Math.round(p.armor),
       p.alive ? 1 : 0, WEAPON_LIST.indexOf(p.wid), p.reloading ? 1 : 0, p.protectT > 0 ? 1 : 0, p.kills, p.deaths, p.spawnSeq,
-      Math.round(Math.max(0, p.respawnT) * 10) / 10, p.maxHp, p.score,
+      Math.round(Math.max(0, p.respawnT) * 10) / 10, p.maxHp, p.score, Math.round(p.revive * 100) / 100,
     ]);
     return {
       tm: Math.round(this.time * 1000) / 1000, ps,
@@ -992,7 +1031,7 @@ export class Game {
     if (this.snapClock === null || sample > this.snapClock) this.snapClock = sample;
     else this.snapClock += (sample - this.snapClock) * 0.02;
     for (const row of s.ps) {
-      const [id, x, y, a, hp, armor, alive, wi, rl, prot, kills, deaths, sq, respawnT, maxHp, score] = row;
+      const [id, x, y, a, hp, armor, alive, wi, rl, prot, kills, deaths, sq, respawnT, maxHp, score, revive] = row;
       const p = this.players.get(id);
       if (!p) continue;
       p.hp = hp;
@@ -1002,6 +1041,7 @@ export class Game {
       p.deaths = deaths;
       p.score = score;
       p.respawnT = respawnT;
+      p.revive = revive;
       p.protectT = prot ? Math.max(p.protectT, 0.1) : 0;
       if (p.id === this.localId) {
         if (!alive) p.alive = false;
@@ -1104,7 +1144,9 @@ export class Game {
         p.protectT = SPAWN_PROTECT;
         p.buf.length = 0;
         p.killedBy = null;
-        if (ev.p === local) {
+        p.revive = 0;
+        if (ev.rv) p.hp = Math.round(p.maxHp * REVIVE_HP); // revived: keeps weapons, armour and grenades
+        else if (ev.p === local) {
           p.slots = this.armSlots(p);
           p.cur = 0;
           p.wid = p.slots[0].id;
@@ -1174,8 +1216,8 @@ export class Game {
   }
 }
 
-// [id, x, y, aim, hp, armor, alive, weaponIdx, reloading, protected, kills, deaths, spawnSeq, respawnT, maxHp, score]
-export type SnapPlayer = [string, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
+// [id, x, y, aim, hp, armor, alive, weaponIdx, reloading, protected, kills, deaths, spawnSeq, respawnT, maxHp, score, revive]
+export type SnapPlayer = [string, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
 export interface Snapshot { tm: number; ps: SnapPlayer[]; st: [number, number, number, number, number, number] }
 export interface FullState { players: PlayerInfo[]; crates: [number, number][]; pickups: [number, number, WeaponId | null][]; time: number }
 export interface ClientInput { x: number; y: number; a: number; w: number; rl: number; sq: number; sh: ShotMsg[] }
