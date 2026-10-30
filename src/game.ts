@@ -60,6 +60,7 @@ export interface Player extends PlayerInfo {
   score: number;
   streak: number;
   lastShotAt: number;
+  lastQuietShotAt: number; // silenced weapons: only gives the shooter away up close
   lastHurtAt: number;
   lastAttacker: string | null;
   killedBy: string | null;
@@ -151,6 +152,13 @@ export const REVIVE_TIME = 3;
 export const REVIVE_RANGE = 75;
 const REVIVE_HP = 0.5;
 
+/** A silenced shot still shows its muzzle flash to enemies this close, even out of a bush. */
+const QUIET_SPOT = 420;
+/** ...and is heard this far. */
+const QUIET_HEAR = 300;
+/** Bots near a hit team mate look for the shooter. */
+const ALARM_RANGE = 550;
+
 /** Fire from the flamethrower is gone after this many seconds. */
 export const FLAME_LIFE = 10;
 const grenadeCount = (perk: PerkId) => GRENADES + (perk === 'grenadier' ? 2 : 0);
@@ -230,7 +238,7 @@ export class Game {
       ...info, x: this.map.w / 2, y: this.map.h / 2, vx: 0, vy: 0, aim: 0, r: info.boss ? 28 : PLAYER_RADIUS,
       hp: maxHp, maxHp, armor: 0, alive: false, respawnT: 0, protectT: 0,
       slots: loadout(info.primary, info.perk), cur: 0, wid: info.primary, reloading: false,
-      kills: 0, deaths: 0, score: 0, streak: 0, lastShotAt: -9, lastHurtAt: -9, lastAttacker: null, killedBy: null,
+      kills: 0, deaths: 0, score: 0, streak: 0, lastShotAt: -9, lastQuietShotAt: -9, lastHurtAt: -9, lastAttacker: null, killedBy: null,
       spawnSeq: 0, dmgMul: 1, brain: null, removeT: 0, buf: [],
       grenades: grenadeCount(info.perk), nextThrow: 0, tier: 0, lastBurnAt: -9, revive: 0, revives: 0,
     };
@@ -513,7 +521,8 @@ export class Game {
       const jitter = def.pellets > 1 ? (Math.random() - 0.5) * spread * 0.25 : 0;
       angles.push(Math.round((p.aim + base + jitter) * 1000) / 1000);
     }
-    if (!def.silent) p.lastShotAt = this.time;
+    if (def.silent) p.lastQuietShotAt = this.time;
+    else p.lastShotAt = this.time;
     if (this.authority) this.alertBots(p, mz.x, mz.y, w);
     const b = p.id + '.' + ++this.seq;
     const x = Math.round(mz.x), y = Math.round(mz.y);
@@ -533,7 +542,8 @@ export class Game {
     const p = this.players.get(pid);
     if (!p || !p.alive || !WEAPONS[s.w] || !Array.isArray(s.a)) return;
     const def = WEAPONS[s.w];
-    if (!def.silent) p.lastShotAt = this.time;
+    if (def.silent) p.lastQuietShotAt = this.time;
+    else p.lastShotAt = this.time;
     this.alertBots(p, s.x, s.y, s.w);
     const angles = s.a.slice(0, def.pellets);
     if (def.kind === 'beam') {
@@ -549,11 +559,10 @@ export class Game {
   /** Gunfire is audible: nearby enemy bots investigate the area. */
   private alertBots(shooter: Player, x: number, y: number, w: WeaponId) {
     const def = WEAPONS[w];
-    if (def.silent) return;
-    const range = w === 'grenade' ? 500 : def.kind === 'flame' ? 450 : w === 'sniper' || w === 'rocket' || w === 'rail' ? 1400 : 1000;
+    const range = def.silent ? QUIET_HEAR : w === 'grenade' ? 500 : def.kind === 'flame' ? 450 : w === 'sniper' || w === 'rocket' || w === 'rail' ? 1400 : 1000;
     for (const b of this.list) {
       if (!b.brain || !b.alive || b === shooter || sameTeam(b, shooter)) continue;
-      if (dist2(b.x, b.y, x, y) < range * range) b.brain.onNoise(x, y);
+      if (dist2(b.x, b.y, x, y) < range * range) b.brain.onNoise(x, y, this.time);
     }
   }
 
@@ -732,7 +741,15 @@ export class Game {
     t.lastHurtAt = this.time;
     if (attacker && attacker !== t) t.lastAttacker = attacker.id;
     this.emit({ e: 'hit', t: t.id, by: attacker?.id ?? '', d: Math.round(dmg), x: Math.round(x), y: Math.round(y), b: bid });
-    if (t.brain && attacker && attacker !== t) t.brain.onHurt(attacker);
+    if (attacker && attacker !== t) {
+      if (t.brain) t.brain.onHurt(attacker, this.time);
+      // team mates close by notice the hit and look for the shooter
+      if (t.team >= 0) {
+        for (const o of this.list) {
+          if (o.brain && o.alive && o !== t && o.team === t.team && dist2(o.x, o.y, t.x, t.y) < ALARM_RANGE ** 2) o.brain.onNoise(attacker.x, attacker.y, this.time);
+        }
+      }
+    }
     if (t.hp <= 0) this.kill(t, attacker, w);
   }
 
@@ -877,7 +894,9 @@ export class Game {
     if (!viewer || viewer.id === p.id || sameTeam(viewer, p)) return true;
     if (this.time - p.lastShotAt < 1.0 || this.time - p.lastHurtAt < 0.6) return true;
     if (!this.map.bushAt(p.x, p.y)) return true;
-    return dist2(viewer.x, viewer.y, p.x, p.y) < 120 * 120;
+    const d2 = dist2(viewer.x, viewer.y, p.x, p.y);
+    if (this.time - p.lastQuietShotAt < 0.8 && d2 < QUIET_SPOT ** 2) return true;
+    return d2 < 120 * 120;
   }
 
   // ------------------------------------------------------------ modes
@@ -1094,7 +1113,10 @@ export class Game {
       case 'shot': {
         if (ev.p === local) return false;
         const p = this.players.get(ev.p);
-        if (p && !WEAPONS[ev.w].silent) p.lastShotAt = this.time;
+        if (p) {
+          if (WEAPONS[ev.w].silent) p.lastQuietShotAt = this.time;
+          else p.lastShotAt = this.time;
+        }
         this.spawnBullets({ id: ev.p, team: p?.team ?? -1 }, ev.w, ev.x, ev.y, ev.a, ev.b, true, ev.pw ?? 1);
         return true;
       }

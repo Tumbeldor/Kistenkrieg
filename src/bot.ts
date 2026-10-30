@@ -12,6 +12,9 @@ export class Bot {
   private seenT = 0;
   private lastKnown: Vec | null = null;
   private lastKnownT = -99;
+  /** Whoever just shot us: seen even inside a bush for a moment (muzzle flash, tracer). */
+  private spotted: Player | null = null;
+  private spottedUntil = -99;
   private path: Vec[] = [];
   private pathGoal: Vec | null = null;
   private repathT = 0;
@@ -39,6 +42,7 @@ export class Bot {
     this.targetVisible = false;
     this.seenT = 0;
     this.lastKnown = null;
+    this.spotted = null;
     this.path = [];
     this.pathGoal = null;
     this.goal = null;
@@ -46,16 +50,19 @@ export class Bot {
   }
 
   /** A gunshot was heard: investigate roughly where it came from. */
-  onNoise(x: number, y: number) {
+  onNoise(x: number, y: number, now: number) {
     if (this.targetVisible) return;
     this.lastKnown = { x: x + rand(-140, 140), y: y + rand(-140, 140) };
-    this.lastKnownT = performance.now() / 1000;
+    this.lastKnownT = now;
   }
 
-  onHurt(attacker: Player) {
+  onHurt(attacker: Player, now: number) {
+    this.spotted = attacker;
+    this.spottedUntil = now + 2.5;
     if (!this.targetVisible) {
       this.lastKnown = { x: attacker.x + rand(-80, 80), y: attacker.y + rand(-80, 80) };
-      this.lastKnownT = performance.now() / 1000;
+      this.lastKnownT = now;
+      this.thinkT = Math.min(this.thinkT, 0.05); // turn around quickly
     }
   }
 
@@ -67,7 +74,7 @@ export class Bot {
     inp.next = false;
     inp.slot = -1;
     inp.throw = false;
-    const now = performance.now() / 1000;
+    const now = g.time;
 
     this.thinkT -= dt;
     if (this.thinkT <= 0) {
@@ -199,11 +206,12 @@ export class Bot {
     for (const e of g.list) {
       if (e === me || !e.alive || sameTeam(e, me)) continue;
       // only spot what a player would see on screen: a wide, flat box around the bot
-      const keep = e === this.target && this.targetVisible ? 1.15 : 1;
+      const spotted = e === this.spotted && now < this.spottedUntil;
+      const keep = (e === this.target && this.targetVisible) || spotted ? 1.15 : 1;
       const ax = Math.abs(e.x - me.x), ay = Math.abs(e.y - me.y);
       if (ax > this.diff.sight * keep || ay > this.diff.sight * 0.5 * keep) continue;
       const dd = Math.hypot(ax, ay);
-      if (!g.visibleTo(me, e)) continue;
+      if (!spotted && !g.visibleTo(me, e)) continue;
       if (!g.map.los(me.x, me.y, e.x, e.y)) continue;
       let score = dd;
       if (e === this.target) score -= 180;

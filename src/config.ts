@@ -33,7 +33,7 @@ export interface WeaponDef {
   botRange: number;
   spinUp: number;
   pickupAmmo: number;
-  silent: boolean; // bots do not hear it, does not reveal the shooter
+  silent: boolean; // quiet: heard and seen only up close, does not reveal the shooter from afar
   fuse: number; // grenades: seconds until detonation
 }
 
@@ -74,10 +74,10 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
   revolver: W({ id: 'revolver', name: 'Revolver', desc: 'Sechs Schuss, jeder davon sitzt.', unlock: 2,
     dmg: 46, rate: 1.9, mag: 6, reload: 2.0, spread: 0.02, speed: 1700, range: 1000, moveMul: 1.03,
     shake: 3.5, len: 16, thick: 6, botRange: 400, pickupAmmo: 18 }),
-  crossbow: W({ id: 'crossbow', name: 'Armbrust', desc: 'Lautlos und tödlich. Bots hören dich nicht.', unlock: 6,
+  crossbow: W({ id: 'crossbow', name: 'Armbrust', desc: 'Leise und tödlich. Nur aus der Nähe zu hören.', unlock: 6,
     dmg: 80, rate: 1.0, mag: 1, reload: 1.15, spread: 0.006, speed: 1250, range: 1400, moveMul: 0.97, silent: true,
     crateMul: 0.6, shake: 1, color: '#d9d2c0', len: 26, thick: 7, botRange: 520, pickupAmmo: 8 }),
-  smgsil: W({ id: 'smgsil', name: 'Schalldämpfer-MP', desc: 'Leise Maschinenpistole. Verrät dich nicht im Busch.', unlock: 9,
+  smgsil: W({ id: 'smgsil', name: 'Schalldämpfer-MP', desc: 'Leise Maschinenpistole. Verrät dich im Busch nur aus der Nähe.', unlock: 9,
     dmg: 10, rate: 11, mag: 30, reload: 1.5, spread: 0.09, speed: 1350, range: 700, silent: true,
     shake: 1, color: '#e8dcb0', len: 26, thick: 7, botRange: 300, pickupAmmo: 90 }),
   dmr: W({ id: 'dmr', name: 'Präzisionsgewehr', desc: 'Halbautomatisch, große Reichweite, hoher Schaden.', unlock: 12,
