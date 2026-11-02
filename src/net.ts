@@ -3,7 +3,7 @@
 import Peer, { DataConnection } from 'peerjs';
 import { IS_TEST } from './config';
 
-export const PROTOCOL = 4;
+export const PROTOCOL = 5;
 const PREFIX = IS_TEST ? 'kistenkrieg-v1-test-' : 'kistenkrieg-v1-';
 const LOCAL = IS_TEST ? 'kk-test-' : 'kk-';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';

@@ -2,7 +2,7 @@
 import { GUN_TIERS, MapId, TEAM_COLORS, TEAM_NAMES, WEAPONS, WeaponId, skinDef } from './config';
 import type { Fx } from './fx';
 import type { Game, Player } from './game';
-import { FLAME_LIFE, sameTeam } from './game';
+import { FLAME_LIFE, REVIVE_RANGE, sameTeam } from './game';
 import type { Input } from './input';
 import { GameMap, Solid } from './map';
 import { dist } from './geom';
@@ -387,6 +387,9 @@ export class Renderer {
     const me = g.local;
     const viewer = me;
     const drawn: Player[] = [];
+    // survival: fallen team mates waiting for a revive
+    const downed = g.settings.mode === 'survival' && !g.over ? g.list.filter((p) => !p.alive && !p.bot) : [];
+    for (const p of downed) if (inView(p.x, p.y, REVIVE_RANGE + 10)) this.drawDowned(p, g);
     for (const p of g.list) {
       if (!p.alive || !inView(p.x, p.y, 60)) continue;
       if (!g.visibleTo(viewer, p)) continue;
@@ -455,6 +458,7 @@ export class Renderer {
     // ------------------------------------------------------------ screen space
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.drawNameTags(g, drawn);
+    this.drawDownedHints(g, downed);
     for (const t of fx.texts) {
       const p = this.toScreen(t.x, t.y);
       ctx.globalAlpha = Math.min(1, t.life / t.max * 2);
@@ -860,6 +864,95 @@ export class Renderer {
   }
 
   /** Top-down soldier, drawn in its local frame (x = aim direction). */
+  /** A downed player in survival: faded body, the area to stand in and the revive progress. */
+  private drawDowned(p: Player, g: Game) {
+    const ctx = this.ctx;
+    const pulse = 0.5 + Math.sin(this.time * 4) * 0.5;
+    ctx.fillStyle = 'rgba(110,25,20,0.45)';
+    ctx.beginPath(); ctx.ellipse(p.x + 4, p.y + 6, p.r * 1.5, p.r * 1.1, 0.4, 0, 7); ctx.fill();
+    ctx.setLineDash([8, 8]);
+    ctx.strokeStyle = `rgba(156,204,150,${0.25 + pulse * 0.25})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(p.x, p.y, REVIVE_RANGE, 0, 7); ctx.stroke();
+    ctx.setLineDash([]);
+    this.drawPlayer(p, 0.5, g, false);
+    ctx.globalAlpha = 1;
+    if (p.revive > 0) {
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+      ctx.lineWidth = 7;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 11, 0, 7); ctx.stroke();
+      ctx.strokeStyle = '#9ccc96';
+      ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 11, -Math.PI / 2, -Math.PI / 2 + Math.min(1, p.revive) * Math.PI * 2); ctx.stroke();
+      ctx.lineCap = 'butt';
+    }
+    this.medic(p.x, p.y - p.r - 24 - pulse * 3, 10);
+  }
+
+  /** Round badge with a medical cross. */
+  private medic(x: number, y: number, r: number) {
+    const ctx = this.ctx;
+    ctx.fillStyle = 'rgba(20,24,28,0.88)';
+    ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#9ccc96';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.fillStyle = '#9ccc96';
+    const a = r * 0.25, b = r * 0.65;
+    ctx.fillRect(x - a, y - b, a * 2, b * 2);
+    ctx.fillRect(x - b, y - a, b * 2, a * 2);
+  }
+
+  /** Labels under downed team mates, or arrows at the screen edge when they are out of view. */
+  private drawDownedHints(g: Game, downed: Player[]) {
+    const me = g.local;
+    if (!me || !me.alive) return;
+    const ctx = this.ctx;
+    const { W, H } = this;
+    const fs = this.small ? 11 : 13;
+    ctx.textAlign = 'center';
+    for (const p of downed) {
+      const s = this.toScreen(p.x, p.y);
+      const m = 34;
+      const x0 = this.safe.l + m, x1 = W - this.safe.r - m, y0 = this.safe.t + m + 40, y1 = H - this.safe.b - m;
+      if (s.x > x0 && s.x < x1 && s.y > y0 && s.y < y1) {
+        const ty = s.y + (p.r + 22) * this.zoom + 8;
+        const label = p.revive > 0 ? `Wiederbeleben ${Math.floor(Math.min(1, p.revive) * 100)} %` : `${p.name} wiederbeleben`;
+        ctx.font = `700 ${fs + 1}px 'Barlow Condensed', 'Arial Narrow', system-ui, sans-serif`;
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+        ctx.strokeText(label, s.x, ty);
+        ctx.fillStyle = '#9ccc96';
+        ctx.fillText(label, s.x, ty);
+        continue;
+      }
+      // off screen: pin to the edge in the direction of the body
+      const cx = W / 2, cy = H / 2;
+      const dx = s.x - cx, dy = s.y - cy;
+      const k = Math.min((dx > 0 ? x1 - cx : x0 - cx) / (dx || 1e-6), (dy > 0 ? y1 - cy : y0 - cy) / (dy || 1e-6));
+      const ex = cx + dx * k, ey = cy + dy * k;
+      const a = Math.atan2(dy, dx);
+      const pulse = 0.75 + Math.sin(this.time * 5) * 0.25;
+      ctx.globalAlpha = pulse;
+      ctx.fillStyle = '#9ccc96';
+      ctx.beginPath();
+      ctx.moveTo(ex + Math.cos(a) * 24, ey + Math.sin(a) * 24);
+      ctx.lineTo(ex + Math.cos(a + 0.5) * 15, ey + Math.sin(a + 0.5) * 15);
+      ctx.lineTo(ex + Math.cos(a - 0.5) * 15, ey + Math.sin(a - 0.5) * 15);
+      ctx.fill();
+      this.medic(ex, ey, 13);
+      ctx.globalAlpha = 1;
+      ctx.font = `600 ${fs}px 'Barlow', system-ui, sans-serif`;
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+      const ny = ey + (ey > cy ? -20 : 27);
+      ctx.strokeText(p.name, ex, ny);
+      ctx.fillStyle = '#e2d3ac';
+      ctx.fillText(p.name, ex, ny);
+    }
+  }
+
   private drawPlayer(p: Player, alpha: number, g: Game, isMe: boolean, ring: string | null = null) {
     const ctx = this.ctx;
     const t = this.time;
@@ -1207,6 +1300,11 @@ export class Renderer {
         ctx.fillRect(mx + pk.x * s - 1.5, my + pk.y * s - 1.5, 3, 3);
       }
       for (const p of g.list) {
+        if (!p.alive && p !== me && !p.bot && g.settings.mode === 'survival' && Math.sin(this.time * 6) > -0.3) {
+          ctx.fillStyle = '#9ccc96';
+          ctx.fillRect(mx + p.x * s - 1, my + p.y * s - 3.5, 2, 7);
+          ctx.fillRect(mx + p.x * s - 3.5, my + p.y * s - 1, 7, 2);
+        }
         if (!p.alive || p === me) continue;
         const friendly = me && sameTeam(p, me);
         if (!friendly) {
@@ -1303,14 +1401,31 @@ export class Renderer {
       ctx.textAlign = 'center';
       ctx.font = `700 ${small ? 30 : 44}px 'Barlow Condensed', 'Arial Narrow', system-ui, sans-serif`;
       ctx.fillStyle = '#d9796e';
-      ctx.fillText('ELIMINIERT', W / 2, H * 0.42);
+      // survival: keep the middle free so you can watch your team (and your revive)
+      const y0 = g.settings.mode === 'survival' ? H * 0.6 : H * 0.42;
+      ctx.fillText('ELIMINIERT', W / 2, y0);
       ctx.font = `600 ${small ? 14 : 18}px 'Barlow', system-ui, sans-serif`;
       ctx.fillStyle = '#fff';
       const killer = me.killedBy ? g.players.get(me.killedBy)?.name : null;
-      ctx.fillText(killer ? `von ${killer}` : 'Eigenverschulden', W / 2, H * 0.42 + (small ? 28 : 36));
+      ctx.fillText(killer ? `von ${killer}` : 'Eigenverschulden', W / 2, y0 + (small ? 28 : 36));
       ctx.fillStyle = '#d8b04a';
-      const sub = g.settings.mode === 'survival' ? 'Du kommst nach der Welle zurück – du schaust deinem Team zu.' : `Respawn in ${Math.max(0, me.respawnT).toFixed(1)} s`;
-      ctx.fillText(sub, W / 2, H * 0.42 + (small ? 52 : 66));
+      let sub = `Respawn in ${Math.max(0, me.respawnT).toFixed(1)} s`;
+      if (g.settings.mode === 'survival') {
+        const helpers = g.list.some((p) => p !== me && p.alive && !p.bot);
+        sub = me.revive > 0 ? `Du wirst wiederbelebt … ${Math.floor(Math.min(1, me.revive) * 100)} %`
+          : helpers ? (small ? 'Ein Mitspieler kann dich wiederbeleben.' : 'Ein Mitspieler kann dich wiederbeleben – sonst bist du nach der Welle zurück.')
+          : 'Du kommst nach der Welle zurück – du schaust deinem Team zu.';
+        if (me.revive > 0) ctx.fillStyle = '#9ccc96';
+      }
+      const sy = y0 + (small ? 52 : 66);
+      ctx.fillText(sub, W / 2, sy);
+      if (g.settings.mode === 'survival' && me.revive > 0) {
+        const bw = small ? 180 : 260;
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillRect(W / 2 - bw / 2 - 2, sy + 12, bw + 4, 10);
+        ctx.fillStyle = '#9ccc96';
+        ctx.fillRect(W / 2 - bw / 2, sy + 14, bw * Math.min(1, me.revive), 6);
+      }
     }
 
     // crosshair
